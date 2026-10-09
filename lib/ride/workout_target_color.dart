@@ -6,12 +6,17 @@ import '../training_program/training_program.dart';
 /// En dessous du min du step — il faut relancer. Clignote (voir
 /// [workoutTargetColorFor]) plutôt qu'un fond fixe : moins alarmant qu'un
 /// rouge fixe aurait suggéré, mais toujours visible du coin de l'œil.
-const Color kWorkoutBelowTargetColor = Color(0xFF1565C0);
+const Color kWorkoutBelowTargetColor = Color(0xFF2979FF);
 
 /// Au-dessus du max du step — il faut lever le pied. Clignote aussi, plus
 /// urgent que le bleu : c'est celui des deux qui appelle une correction
 /// immédiate (sécurité/effort qui dérape), pas juste une relance.
-const Color kWorkoutAboveTargetColor = Color(0xFFB3261E);
+const Color kWorkoutAboveTargetColor = Color(0xFFFF1744);
+
+/// Phase basse du clignotement hors cible : un anthracite franc plutôt que
+/// le fond habituel de la case (qui peut être une couleur de zone, donc
+/// presque aussi vive que l'alerte et peu contrastée avec elle).
+const Color kWorkoutBlinkOffColor = Color(0xFF2B2B2B);
 
 /// Dans les bornes du step — fixe, volontairement sans clignotement : c'est
 /// l'état où on ne veut justement rien attirer l'œil.
@@ -49,11 +54,10 @@ bool isWorkoutTargetMetric(MetricId metric) => _workoutTargetMetrics.contains(me
 /// borne absente ne referme pas ce côté-là (min seul défini : bleu si en
 /// dessous, jamais rouge). `null` (pas de changement de fond côté appelant,
 /// donc retour au fond habituel de la case) sans entraînement actif
-/// ([milestone] `null`), sans cible sur ce step pour [metric], sans chiffre
-/// ([value] `null`, capteur muet), ou pendant la phase basse du clignotement
-/// ([blinkOn] `false`) pour un dépassement — c'est ce qui fait alterner le
-/// fond entre la couleur d'alerte et le fond normal plutôt qu'une vraie
-/// transparence.
+/// ([milestone] `null`), sans cible sur ce step pour [metric], ou sans chiffre
+/// ([value] `null`, capteur muet). Pendant la phase basse du clignotement
+/// ([blinkOn] `false`) hors cible, le fond est [kWorkoutBlinkOffColor] : le
+/// clignotement alterne entre la couleur d'alerte et l'anthracite.
 ///
 /// Prioritaire sur tout le reste côté appelant (couleur fixe de l'éditeur,
 /// seuils personnalisés `gaugeThresholds`/`gaugeThresholdColors`) : c'est la
@@ -65,7 +69,7 @@ Color? workoutTargetColorFor(WorkoutMilestone? milestone, MetricId metric, doubl
   final range = _targetRangeFor(milestone, metric);
   if (range == null) return null;
   final (min, max) = range;
-  if (min != null && value < min) return blinkOn ? kWorkoutBelowTargetColor : null;
-  if (max != null && value > max) return blinkOn ? kWorkoutAboveTargetColor : null;
+  if (min != null && value < min) return blinkOn ? kWorkoutBelowTargetColor : kWorkoutBlinkOffColor;
+  if (max != null && value > max) return blinkOn ? kWorkoutAboveTargetColor : kWorkoutBlinkOffColor;
   return kWorkoutInRangeColor;
 }
