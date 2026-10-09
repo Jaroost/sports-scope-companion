@@ -755,7 +755,7 @@ class _RideShellPageState extends State<RideShellPage>
     _workoutCuePolicy = workoutProgram == null
         ? null
         : WorkoutCuePolicy(
-            milestones: workoutProgram.milestones,
+            cues: workoutProgram.cues,
             soundDuration: _workoutCue.durationOf,
             elapsed: workoutElapsed,
           );
@@ -1030,7 +1030,7 @@ class _RideShellPageState extends State<RideShellPage>
       _workoutCuePolicy = program == null
           ? null
           : WorkoutCuePolicy(
-              milestones: program.milestones,
+              cues: program.cues,
               soundDuration: _workoutCue.durationOf,
               elapsed: Duration.zero,
             );
@@ -1042,7 +1042,7 @@ class _RideShellPageState extends State<RideShellPage>
     // Lu avant le franchissement lui-même : c'est ce qui fait démarrer le
     // son en avance sur l'offset qu'il annonce.
     final cue = _workoutCuePolicy?.read(elapsed);
-    if (_preset.workout.sounds && cue?.sound != null) _workoutCue.play(cue!.sound!);
+    if (_preset.workout.sounds && cue != null) _workoutCue.play(cue.sound);
 
     final milestone = _workoutPolicy?.read(elapsed);
     if (milestone == null) return;

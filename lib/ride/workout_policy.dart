@@ -49,70 +49,75 @@ class WorkoutPolicy {
   bool get finished => _next >= milestones.length;
 }
 
-/// Décide quel jalon doit lancer son son d'annonce — décalé plus tôt que
-/// son franchissement officiel, pour que la lecture **se termine** au
-/// départ du jalon plutôt que de commencer dessus. Un jalon qui dure 30 s
-/// suivi d'un son de 5 s : le son part à 25 s, pas à 30.
+/// Décide quel son d'un programme doit se lancer maintenant.
 ///
-/// Même famille que [WorkoutPolicy] — pure, testable sans widget ni
-/// horloge — mais un index séparé : l'annonce d'un jalon précède son
-/// franchissement, les deux ne peuvent pas partager un seul curseur. Le
-/// franchissement lui-même (splits/`markLap`) reste sur [WorkoutPolicy],
-/// inchangé — seul l'instant du bip se décale.
+/// Un son est attaché à une frontière (début ou fin d'un bloc) et à un moment
+/// ([WorkoutCueTiming]) : `at` démarre sur la frontière, `before` démarre en
+/// avance pour se **terminer** pile dessus — un bloc de 30 s suivi d'un son de
+/// 5 s : le son part à 25 s, pas à 30.
 ///
-/// Le premier jalon (à l'offset 0) n'a rien avant lui : son son, s'il en a
-/// un, part immédiatement comme avant — aucune anticipation possible avant
-/// le début du programme.
+/// Même famille que [WorkoutPolicy] — pure, testable sans widget ni horloge —
+/// mais un état séparé : un son d'annonce précède le franchissement dont il
+/// parle, les deux ne peuvent pas partager un seul curseur. Le franchissement
+/// lui-même (splits/`markLap`) reste sur [WorkoutPolicy], inchangé.
+///
+/// Le site refuse les sons qui se chevauchent, mais l'ordre de départ de deux
+/// sons (une fin `at` et un début `before` sur la même frontière) dépend de la
+/// durée de chacun, connue ici seulement : on lance donc, à chaque tic, le
+/// son non joué dont l'instant de départ est échu et le plus ancien.
 class WorkoutCuePolicy {
   WorkoutCuePolicy({
-    required this.milestones,
+    required this.cues,
     required this.soundDuration,
     required Duration elapsed,
-  }) {
+  }) : _played = List.filled(cues.length, false) {
+    // `elapsed <= 0` : programme tout juste activé, rien n'est joué — pas même
+    // un son posé sur le départ (voir [WorkoutPolicy]).
     if (elapsed <= Duration.zero) return;
-    while (_next < milestones.length && _cueOffsetSeconds(_next) <= elapsed.inSeconds) {
-      _next++;
+    for (var i = 0; i < cues.length; i++) {
+      if (_startSeconds(cues[i]) <= elapsed.inSeconds) _played[i] = true;
     }
   }
 
-  final List<WorkoutMilestone> milestones;
+  final List<WorkoutCue> cues;
 
   /// Consultée à chaque lecture plutôt que figée à la construction : les
   /// sons se préchargent en tâche de fond (`WorkoutCuePlayer.warmUp`), leur
   /// durée peut donc n'être connue qu'après coup. Une durée encore inconnue
-  /// vaut zéro — l'anticipation est alors nulle, comportement identique à
-  /// avant ce mécanisme, jamais un son en retard sur son jalon.
+  /// vaut zéro — l'anticipation est alors nulle, jamais un son en retard.
   final Duration Function(WorkoutSound sound) soundDuration;
 
-  int _next = 0;
+  final List<bool> _played;
 
-  /// L'instant, en secondes depuis l'activation, où le son du jalon
-  /// [index] doit démarrer pour se terminer pile à son offset. Sans son, pour
-  /// le premier jalon, ou quand le jalon est réglé sur
-  /// [WorkoutCueTiming.at], c'est l'offset lui-même. Jamais avant le jalon
-  /// précédent : un son plus long que le tronçon qui le porte ne doit pas
-  /// empiéter sur l'annonce d'avant.
-  int _cueOffsetSeconds(int index) {
-    final milestone = milestones[index];
-    final sound = milestone.sound;
-    if (index == 0 || sound == null || milestone.cueTiming == WorkoutCueTiming.at) {
-      return milestone.offsetSeconds;
+  /// L'instant, en secondes depuis l'activation, où [cue] doit démarrer.
+  /// Rien ne précède le départ du programme : un son posé sur la frontière 0
+  /// part immédiatement, quel que soit son moment.
+  int _startSeconds(WorkoutCue cue) {
+    if (cue.timing == WorkoutCueTiming.at || cue.boundarySeconds <= 0) {
+      return cue.boundarySeconds;
     }
-
-    final leadMs = soundDuration(sound).inMilliseconds;
-    final leadSeconds = (leadMs / 1000).ceil();
-    final earliest = milestones[index - 1].offsetSeconds;
-    return math.max(earliest, milestone.offsetSeconds - leadSeconds);
+    final leadSeconds = (soundDuration(cue.sound).inMilliseconds / 1000).ceil();
+    return math.max(0, cue.boundarySeconds - leadSeconds);
   }
 
-  /// Le jalon dont le son doit être lancé **ce tic-ci**, ou `null` — au
-  /// plus un par appel, comme [WorkoutPolicy.read].
-  WorkoutMilestone? read(Duration elapsed) {
-    if (_next >= milestones.length) return null;
-    if (_cueOffsetSeconds(_next) > elapsed.inSeconds) return null;
-    return milestones[_next++];
+  /// Le son à lancer **ce tic-ci**, ou `null` — au plus un par appel.
+  WorkoutCue? read(Duration elapsed) {
+    int? best;
+    var bestStart = 0;
+    for (var i = 0; i < cues.length; i++) {
+      if (_played[i]) continue;
+      final start = _startSeconds(cues[i]);
+      if (start > elapsed.inSeconds) continue;
+      if (best == null || start < bestStart) {
+        best = i;
+        bestStart = start;
+      }
+    }
+    if (best == null) return null;
+    _played[best] = true;
+    return cues[best];
   }
 
-  /// Le dernier jalon a-t-il été annoncé ?
-  bool get finished => _next >= milestones.length;
+  /// Tous les sons ont-ils été lancés ?
+  bool get finished => !_played.contains(false);
 }

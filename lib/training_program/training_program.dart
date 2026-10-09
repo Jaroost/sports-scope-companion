@@ -61,48 +61,64 @@ enum WorkoutMilestoneIcon {
   }
 }
 
-/// Le moment où joue le son d'un jalon — catalogue fermé, miroir de
+/// Le moment où joue un son, relatif à la frontière qu'il accompagne (le
+/// début ou la fin d'un bloc) — catalogue fermé, miroir de
 /// `TrainingProgram::CUE_TIMINGS` (`training_program.rb`).
 enum WorkoutCueTiming {
-  /// Décalé en avance pour se **terminer** au départ du jalon
-  /// ([WorkoutCuePolicy]) — comportement par défaut, y compris quand le
-  /// document ne porte pas la clé (site plus ancien que ce réglage).
+  /// Décalé en avance pour se **terminer** pile sur la frontière
+  /// ([WorkoutCuePolicy]).
   before('before'),
 
-  /// Pile au franchissement, sans anticipation — ancien comportement,
-  /// choisi jalon par jalon pour un simple repère qui n'a rien à annoncer
-  /// à l'avance.
+  /// Démarre pile sur la frontière, sans anticipation.
   at('at');
 
   const WorkoutCueTiming(this.key);
 
   final String key;
 
-  /// [before] sur toute valeur absente ou inconnue — jamais [at] par défaut,
-  /// qui désactiverait silencieusement l'anticipation sur un document plus
-  /// ancien que ce réglage.
-  static WorkoutCueTiming parse(Object? raw) {
+  /// [fallback] sur toute valeur absente ou inconnue. Il n'y a pas de défaut
+  /// unique : un son de début joue dans le bloc ([at]), un son de fin aussi
+  /// ([before], il se termine avec le bloc) — `DEFAULT_START_TIMING` /
+  /// `DEFAULT_END_TIMING` côté site. L'ancien format, lui, n'avait que
+  /// [before] pour défaut.
+  static WorkoutCueTiming parse(Object? raw, {required WorkoutCueTiming fallback}) {
     if (raw is String) {
       for (final timing in WorkoutCueTiming.values) {
         if (timing.key == raw) return timing;
       }
     }
-    return WorkoutCueTiming.before;
+    return fallback;
   }
 }
 
+/// Un son à jouer sur une frontière du programme : [boundarySeconds] depuis
+/// l'activation — le début d'un bloc, ou sa fin (qui est aussi le début du
+/// suivant). Le programme en porte la liste à part ([TrainingProgram.cues]) :
+/// un bloc peut avoir un son à chaque bout, avec chacun son [timing].
+@immutable
+class WorkoutCue {
+  const WorkoutCue({
+    required this.boundarySeconds,
+    required this.sound,
+    required this.timing,
+  });
+
+  final int boundarySeconds;
+  final WorkoutSound sound;
+  final WorkoutCueTiming timing;
+}
+
 /// Un jalon de la timeline : à [offsetSeconds] de l'activation du programme,
-/// il ferme le tronçon en cours et en ouvre un nouveau nommé [segmentName],
-/// en jouant [sound] si renseigné (le premier jalon, à 0, n'en joue
-/// généralement aucun — rien à annoncer, le programme vient de démarrer).
+/// il ferme le tronçon en cours et en ouvre un nouveau nommé [segmentName].
+/// C'est le début d'un bloc du site ; le dernier jalon, sans nom ni cibles,
+/// n'est que la fin du dernier bloc. Les sons ne sont pas portés ici mais
+/// par [TrainingProgram.cues].
 @immutable
 class WorkoutMilestone {
   const WorkoutMilestone({
     required this.offsetSeconds,
-    required this.sound,
     required this.segmentName,
     required this.icon,
-    required this.cueTiming,
     required this.color,
     required this.textColor,
     required this.targetPower,
@@ -120,16 +136,11 @@ class WorkoutMilestone {
   });
 
   final int offsetSeconds;
-  final WorkoutSound? sound;
   final String segmentName;
 
   /// L'icône du tronçon qu'ouvre ce jalon — voir `workoutMilestoneIconFor`
   /// (`companion_icons.dart`) pour le dessin réel.
   final WorkoutMilestoneIcon? icon;
-
-  /// Voir [WorkoutCueTiming] — ne concerne que [WorkoutCuePolicy], sans effet
-  /// sur le franchissement lui-même ([WorkoutPolicy]).
-  final WorkoutCueTiming cueTiming;
 
   /// Fond/texte du tronçon, réglés dans l'éditeur — mêmes `#rrggbb` que
   /// `DashboardBlock.color`/`textColor`, mais propres au jalon : c'est ce que
@@ -157,16 +168,13 @@ class WorkoutMilestone {
   final double? minSpeedKmh;
   final double? maxSpeedKmh;
 
-  static WorkoutMilestone? parse(Object? raw) {
-    if (raw is! Map) return null;
-    final offset = raw['offset_seconds'];
-    if (offset is! num || offset < 0) return null;
+  /// Le jalon qui ouvre le bloc [raw] (ou, dans l'ancien format, le jalon
+  /// [raw] lui-même), à [offsetSeconds]. Les sons ne sont pas lus ici.
+  static WorkoutMilestone fromMap(Map raw, int offsetSeconds) {
     return WorkoutMilestone(
-      offsetSeconds: offset.toInt(),
-      sound: WorkoutSound.parse(raw['sound']),
+      offsetSeconds: offsetSeconds,
       segmentName: raw['segment_name'] is String ? raw['segment_name'] as String : '',
       icon: WorkoutMilestoneIcon.parse(raw['icon']),
-      cueTiming: WorkoutCueTiming.parse(raw['cue_timing']),
       color: _colorOf(raw['color']),
       textColor: _colorOf(raw['text_color']),
       targetPower: _numOf(raw['target_power']),
@@ -183,6 +191,28 @@ class WorkoutMilestone {
       maxSpeedKmh: _numOf(raw['max_speed_kmh']),
     );
   }
+
+  /// Le jalon de fin de programme : rien à nommer ni à viser, il ne fait que
+  /// clore le dernier bloc (voir [TrainingProgram.milestones]).
+  static WorkoutMilestone closing(int offsetSeconds) => WorkoutMilestone(
+        offsetSeconds: offsetSeconds,
+        segmentName: '',
+        icon: null,
+        color: null,
+        textColor: null,
+        targetPower: null,
+        minPower: null,
+        maxPower: null,
+        targetHeartRate: null,
+        minHeartRate: null,
+        maxHeartRate: null,
+        targetCadence: null,
+        minCadence: null,
+        maxCadence: null,
+        targetSpeedKmh: null,
+        minSpeedKmh: null,
+        maxSpeedKmh: null,
+      );
 
   static double? _numOf(Object? raw) => raw is num ? raw.toDouble() : null;
 
@@ -210,16 +240,22 @@ class TrainingProgram {
     required this.name,
     required this.shareToken,
     required this.milestones,
+    this.cues = const [],
   });
 
   final int id;
   final String name;
   final String shareToken;
 
-  /// Triés par [WorkoutMilestone.offsetSeconds] croissant, premier élément
-  /// toujours à 0 — garanti côté Rails (`TrainingProgram#validate_milestones`),
-  /// revérifié ici au parse plutôt que supposé.
+  /// Le début de chaque bloc, puis un jalon de clôture à la fin du dernier.
+  /// Triés par [WorkoutMilestone.offsetSeconds] strictement croissant, premier
+  /// élément toujours à 0 — revérifié ici au parse plutôt que supposé.
   final List<WorkoutMilestone> milestones;
+
+  /// Les sons du programme, un par son réglé sur le début ou la fin d'un
+  /// bloc. Leur ordre n'est pas garanti : [WorkoutCuePolicy] les trie par
+  /// instant de départ, qui dépend de la durée du son.
+  final List<WorkoutCue> cues;
 
   /// Le tronçon en cours à [elapsed] — le dernier jalon dont l'offset est déjà
   /// atteint. Jamais `null` en pratique (le premier jalon est toujours à 0,
@@ -280,8 +316,12 @@ class TrainingProgram {
 
   /// Décode `{ training_program: {...} }` ou l'objet programme directement.
   /// Défensif comme `RidePreset.parse` : jamais d'exception, `null` si le
-  /// document est inexploitable (jalons manquants, mal triés, sans jalon à 0)
-  /// — un programme à moitié compris ne doit jamais se dérouler à moitié.
+  /// document est inexploitable — un programme à moitié compris ne doit
+  /// jamais se dérouler à moitié.
+  ///
+  /// Lit `blocks` (durée + sons de début/fin par bloc) ; à défaut, l'ancien
+  /// format `milestones` (instants cumulés, un son par jalon), qu'un site plus
+  /// ancien que l'appli sert encore.
   static TrainingProgram? parse(Object? raw) {
     try {
       final map = raw is Map && raw['training_program'] is Map
@@ -294,29 +334,83 @@ class TrainingProgram {
       if (name is! String || name.isEmpty) return null;
       if (token is! String || token.isEmpty) return null;
 
-      final rawMilestones = map['milestones'];
-      if (rawMilestones is! List || rawMilestones.isEmpty) return null;
-
-      final milestones = [
-        for (final entry in rawMilestones)
-          if (WorkoutMilestone.parse(entry) case final m?) m,
-      ];
-      if (milestones.isEmpty || milestones.first.offsetSeconds != 0) return null;
-      for (var i = 1; i < milestones.length; i++) {
-        if (milestones[i].offsetSeconds <= milestones[i - 1].offsetSeconds) {
-          return null;
-        }
-      }
+      final rawBlocks = map['blocks'];
+      final timeline = rawBlocks is List && rawBlocks.isNotEmpty
+          ? _fromBlocks(rawBlocks)
+          : _fromLegacyMilestones(map['milestones']);
+      if (timeline == null) return null;
 
       return TrainingProgram(
         id: map['id'] is num ? (map['id'] as num).toInt() : 0,
         name: name,
         shareToken: token,
-        milestones: milestones,
+        milestones: timeline.milestones,
+        cues: timeline.cues,
       );
     } catch (e) {
       debugPrint('[entraînement] programme illisible : $e');
       return null;
     }
+  }
+
+  /// Un seul bloc illisible (durée absente ou nulle) rend tout le programme
+  /// inexploitable : le sauter décalerait tous les suivants.
+  static ({List<WorkoutMilestone> milestones, List<WorkoutCue> cues})? _fromBlocks(List rawBlocks) {
+    final milestones = <WorkoutMilestone>[];
+    final cues = <WorkoutCue>[];
+    var offset = 0;
+
+    for (final entry in rawBlocks) {
+      if (entry is! Map) return null;
+      final duration = entry['duration_seconds'];
+      if (duration is! num || duration < 1) return null;
+
+      milestones.add(WorkoutMilestone.fromMap(entry, offset));
+      _addCue(cues, entry['start_sound'], entry['start_cue_timing'], offset, WorkoutCueTiming.at);
+      offset += duration.toInt();
+      _addCue(cues, entry['end_sound'], entry['end_cue_timing'], offset, WorkoutCueTiming.before);
+    }
+
+    milestones.add(WorkoutMilestone.closing(offset));
+    return (milestones: milestones, cues: cues);
+  }
+
+  static void _addCue(
+    List<WorkoutCue> cues,
+    Object? rawSound,
+    Object? rawTiming,
+    int boundarySeconds,
+    WorkoutCueTiming fallback,
+  ) {
+    final sound = WorkoutSound.parse(rawSound);
+    if (sound == null) return;
+    cues.add(WorkoutCue(
+      boundarySeconds: boundarySeconds,
+      sound: sound,
+      timing: WorkoutCueTiming.parse(rawTiming, fallback: fallback),
+    ));
+  }
+
+  /// L'ancien format : chaque jalon porte son son, annoncé en avance par
+  /// défaut (`before`). Le dernier jalon, qui n'ouvre aucun bloc, garde sa
+  /// place dans la timeline (nom et cibles inclus) comme avant.
+  static ({List<WorkoutMilestone> milestones, List<WorkoutCue> cues})? _fromLegacyMilestones(Object? raw) {
+    if (raw is! List || raw.isEmpty) return null;
+
+    final milestones = <WorkoutMilestone>[];
+    final cues = <WorkoutCue>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final offset = entry['offset_seconds'];
+      if (offset is! num || offset < 0) continue;
+      milestones.add(WorkoutMilestone.fromMap(entry, offset.toInt()));
+      _addCue(cues, entry['sound'], entry['cue_timing'], offset.toInt(), WorkoutCueTiming.before);
+    }
+
+    if (milestones.isEmpty || milestones.first.offsetSeconds != 0) return null;
+    for (var i = 1; i < milestones.length; i++) {
+      if (milestones[i].offsetSeconds <= milestones[i - 1].offsetSeconds) return null;
+    }
+    return (milestones: milestones, cues: cues);
   }
 }
