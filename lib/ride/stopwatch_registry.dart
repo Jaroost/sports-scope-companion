@@ -61,13 +61,26 @@ class TimerController extends ChangeNotifier {
   int _durationS = 60;
   BellSound? _sound;
 
+  /// La durée réglée sur le téléphone, qui l'emporte sur celle du profil
+  /// jusqu'à la fin de la sortie. `null` : celle du profil.
+  int? _overrideS;
+
   /// Réglages du bloc, relus à chaque construction. Un minuteur en cours ou
   /// fini garde sa durée : la changer sous les doigts décalerait l'échéance.
   void configure(int durationS, BellSound? sound) {
     _sound = sound;
     if (!_watch.isRunning && !_finished && _watch.elapsedMicroseconds == 0) {
-      _durationS = durationS;
+      _durationS = _overrideS ?? durationS;
     }
+  }
+
+  /// Règle la durée depuis l'appli, sans passer par le site. Refusé une fois
+  /// le minuteur lancé : on ne décale pas une échéance en cours.
+  void setDuration(Duration duration) {
+    if (!isUntouched || duration.inSeconds < 1) return;
+    _overrideS = duration.inSeconds;
+    _durationS = _overrideS!;
+    notifyListeners();
   }
 
   bool get isRunning => _watch.isRunning;

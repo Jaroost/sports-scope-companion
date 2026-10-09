@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoTheme, CupertinoThemeData, CupertinoTextThemeData, CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
 
 import '../../dashboard/dashboard_block.dart';
@@ -245,13 +246,28 @@ class _TimerCardState extends State<TimerCard> {
               Text(widget.label, style: TextStyle(color: fg, fontSize: 15)),
               const SizedBox(height: 4),
             ],
-            Text(
-              formatDuration(c.remaining),
-              style: TextStyle(
-                color: fg,
-                fontSize: compact ? 34 : 56,
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            // Touchable seulement avant le départ : le temps sert alors de
+            // réglage de la durée.
+            InkWell(
+              onTap: c.isUntouched ? () => _editDuration(context) : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    formatDuration(c.remaining),
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: compact ? 34 : 56,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  if (c.isUntouched) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.edit, size: compact ? 14 : 18, color: fg.withValues(alpha: 0.54)),
+                  ],
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -282,6 +298,54 @@ class _TimerCardState extends State<TimerCard> {
         ),
       ),
     );
+  }
+
+  /// Minutes + secondes, à la molette. Annuler laisse la durée telle quelle ;
+  /// zéro est refusé par le contrôleur (un minuteur de 0 s n'a pas de sens).
+  Future<void> _editDuration(BuildContext context) async {
+    var picked = widget.controller.remaining;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        // Fond sombre explicite, celui des cartes : la dialogue héritait du
+        // blanc du thème, où les molettes blanches ne se lisaient plus.
+        backgroundColor: BlockCard.background,
+        title: const Text(
+          'Durée du minuteur',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: SizedBox(
+          height: 180,
+          width: 280,
+          child: CupertinoTheme(
+            data: const CupertinoThemeData(
+              brightness: Brightness.dark,
+              textTheme: CupertinoTextThemeData(
+                pickerTextStyle: TextStyle(color: Colors.white, fontSize: 22),
+                dateTimePickerTextStyle:
+                    TextStyle(color: Colors.white, fontSize: 22),
+              ),
+            ),
+            child: CupertinoTimerPicker(
+              mode: CupertinoTimerPickerMode.ms,
+              initialTimerDuration: picked,
+              onTimerDurationChanged: (d) => picked = d,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler', style: TextStyle(color: Colors.white70)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) widget.controller.setDuration(picked);
   }
 
   Widget _button(bool compact, IconData icon, String tooltip, VoidCallback? onPressed) =>
