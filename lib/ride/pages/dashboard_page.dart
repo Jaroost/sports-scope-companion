@@ -472,6 +472,14 @@ class DashboardPage extends StatelessWidget {
             color: lapDelta.color,
             textColor: lapDelta.textColor,
           ),
+        final TimerBlock timer => TimerCard(
+            controller: sources.stopwatches!.timerOf(timer.id)
+              ..configure(timer.durationS, timer.sound),
+            label: timer.label,
+            mode: timer.mode,
+            color: timer.color,
+            textColor: timer.textColor,
+          ),
         final StopwatchBlock stopwatch => StopwatchCard(
             controller: sources.stopwatches!.of(stopwatch.id),
             label: stopwatch.label,

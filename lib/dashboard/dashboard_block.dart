@@ -130,6 +130,7 @@ sealed class DashboardBlock {
         ),
       'fueling' => FuelingBlock.parse(raw),
       'stopwatch' => StopwatchBlock.parse(raw),
+      'timer' => TimerBlock.parse(raw),
       'training_budget' => TrainingBudgetBlock(
           mode: _modeOf(raw['mode'], TrainingBudgetMode.values),
           color: color,
@@ -2078,6 +2079,75 @@ enum StopwatchMode with BlockMode {
 
   @override
   final String key;
+}
+
+/// Un minuteur : compte à rebours de [durationS] secondes, un bouton
+/// démarrer/arrêter et un bouton de remise à zéro. À l'échéance le fond
+/// clignote jusqu'à ce qu'on appuie, et [sound] est joué s'il est réglé.
+///
+/// Même état partagé que [StopwatchBlock] (`StopwatchRegistry`), indexé par
+/// [id].
+class TimerBlock extends DashboardBlock {
+  const TimerBlock({
+    this.id = StopwatchBlock.defaultId,
+    this.label = '',
+    this.durationS = defaultDurationS,
+    this.sound,
+    this.mode = StopwatchMode.full,
+    super.color,
+    super.textColor,
+  });
+
+  final String id;
+  final String label;
+
+  /// Durée totale, en secondes (réglée en minutes + secondes sur le site).
+  final int durationS;
+
+  /// Le son joué à l'échéance ; `null` : silencieux (le défaut).
+  final BellSound? sound;
+  final StopwatchMode mode;
+
+  static const defaultDurationS = 300;
+  static const maxDurationS = 24 * 3600;
+
+  static TimerBlock parse(Map<dynamic, dynamic> raw) {
+    final id = raw['id'];
+    final label = raw['label'];
+    final duration = raw['duration_s'];
+    BellSound? sound;
+    if (raw['sound'] is String) {
+      for (final candidate in BellSound.values) {
+        if (candidate.key == raw['sound']) sound = candidate;
+      }
+    }
+    return TimerBlock(
+      id: id is String && id.trim().isNotEmpty ? id.trim() : StopwatchBlock.defaultId,
+      label: label is String ? label.trim() : '',
+      durationS: duration is num && duration.isFinite
+          ? duration.round().clamp(1, maxDurationS)
+          : defaultDurationS,
+      sound: sound,
+      mode: DashboardBlock._modeOf(raw['mode'], StopwatchMode.values),
+      color: DashboardBlock._colorOf(raw, 'color'),
+      textColor: DashboardBlock._colorOf(raw, 'text_color'),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TimerBlock &&
+      other.id == id &&
+      other.label == label &&
+      other.durationS == durationS &&
+      other.sound == sound &&
+      other.mode == mode &&
+      other.color == color &&
+      other.textColor == textColor;
+
+  @override
+  int get hashCode =>
+      Object.hash(id, label, durationS, sound, mode, color, textColor);
 }
 
 /// L'heure courante.

@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
+import '../dashboard/dashboard_block.dart' show BellSound;
+import 'blocks/bell_player.dart';
 
 /// Un chronomètre : démarrer/arrêter (même bouton) et remettre à zéro.
 ///
@@ -37,6 +42,85 @@ class StopwatchController extends ChangeNotifier {
   }
 }
 
+/// Un minuteur : compte à rebours depuis [durationS], démarrer/arrêter (même
+/// bouton) et remise à zéro.
+///
+/// **Détecte lui-même son échéance** (un `Timer` d'une seule fois, armé au
+/// démarrage) plutôt que de laisser un widget la constater : la page qui le
+/// montre peut ne pas être à l'écran quand il se termine, et c'est
+/// précisément là que le son compte. Le son est joué par un [BellPlayer] que
+/// le minuteur possède (flux d'alarme, traverse le mode silencieux).
+///
+/// Fini, il le reste jusqu'à un appui : le fond clignote tant qu'on n'a pas
+/// acquitté, et l'appui sur le bouton principal remet à zéro.
+class TimerController extends ChangeNotifier {
+  final Stopwatch _watch = Stopwatch();
+  final BellPlayer _bell = BellPlayer();
+  Timer? _due;
+  bool _finished = false;
+  int _durationS = 60;
+  BellSound? _sound;
+
+  /// Réglages du bloc, relus à chaque construction. Un minuteur en cours ou
+  /// fini garde sa durée : la changer sous les doigts décalerait l'échéance.
+  void configure(int durationS, BellSound? sound) {
+    _sound = sound;
+    if (!_watch.isRunning && !_finished && _watch.elapsedMicroseconds == 0) {
+      _durationS = durationS;
+    }
+  }
+
+  bool get isRunning => _watch.isRunning;
+  bool get isFinished => _finished;
+  bool get isUntouched => !_finished && _watch.elapsedMicroseconds == 0;
+
+  Duration get remaining {
+    if (_finished) return Duration.zero;
+    final left = Duration(seconds: _durationS) - _watch.elapsed;
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  void toggle() {
+    if (_finished) {
+      reset();
+      return;
+    }
+    if (_watch.isRunning) {
+      _watch.stop();
+      _due?.cancel();
+    } else {
+      _watch.start();
+      _due = Timer(remaining, _finish);
+    }
+    notifyListeners();
+  }
+
+  void reset() {
+    _due?.cancel();
+    _watch
+      ..stop()
+      ..reset();
+    _finished = false;
+    unawaited(_bell.stop());
+    notifyListeners();
+  }
+
+  void _finish() {
+    _watch.stop();
+    _finished = true;
+    final sound = _sound;
+    if (sound != null) unawaited(_bell.start(sound));
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _due?.cancel();
+    _bell.dispose();
+    super.dispose();
+  }
+}
+
 /// Les chronomètres de la sortie, par identité (`StopwatchBlock.id`).
 ///
 /// Vit dans la coquille et non dans le widget : le `PageView` reconstruit les
@@ -46,14 +130,24 @@ class StopwatchController extends ChangeNotifier {
 /// donc le même chrono.
 class StopwatchRegistry {
   final Map<String, StopwatchController> _byId = {};
+  final Map<String, TimerController> _timersById = {};
 
   StopwatchController of(String id) =>
       _byId.putIfAbsent(id, StopwatchController.new);
+
+  /// Les minuteurs ont leur propre espace d'identités : un chrono et un
+  /// minuteur de même `id` ne se confondent pas.
+  TimerController timerOf(String id) =>
+      _timersById.putIfAbsent(id, TimerController.new);
 
   void dispose() {
     for (final controller in _byId.values) {
       controller.dispose();
     }
     _byId.clear();
+    for (final timer in _timersById.values) {
+      timer.dispose();
+    }
+    _timersById.clear();
   }
 }

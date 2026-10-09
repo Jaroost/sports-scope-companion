@@ -472,6 +472,14 @@ class _LapListBodyState extends State<LapListBody> {
           color: lapDelta.color,
           textColor: lapDelta.textColor,
         ),
+      final TimerBlock timer => TimerCard(
+          controller: widget.sources.stopwatches!.timerOf(timer.id)
+            ..configure(timer.durationS, timer.sound),
+          label: timer.label,
+          mode: timer.mode,
+          color: timer.color,
+          textColor: timer.textColor,
+        ),
       final StopwatchBlock stopwatch => StopwatchCard(
           controller: widget.sources.stopwatches!.of(stopwatch.id),
           label: stopwatch.label,
