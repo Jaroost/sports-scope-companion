@@ -54,6 +54,7 @@ import 'ride_pages.dart';
 import 'route_climbs.dart';
 import 'route_profile.dart';
 import 'route_resupply.dart';
+import 'stopwatch_registry.dart';
 import 'screen_policy.dart';
 import 'turn_proximity.dart';
 import 'workout_cue_player.dart';
@@ -704,6 +705,10 @@ class _RideShellPageState extends State<RideShellPage>
   /// capteur de puissance : sinon [WPrimeBalance] n'aurait jamais rien à lire.
   WPrimeBalance? _wPrime;
 
+  /// Les chronomètres posés sur les pages — ici et non dans leur widget, que le
+  /// `PageView` reconstruit en changeant de page.
+  final StopwatchRegistry _stopwatches = StopwatchRegistry();
+
   /// Construit une fois : un changement de page ne doit pas reconstruire l'arbre
   /// du WebView.
   Widget? _webView;
@@ -855,6 +860,7 @@ class _RideShellPageState extends State<RideShellPage>
       riderProfile: widget.riderProfile,
       trainingBudget: widget.trainingBudget,
       wPrime: _wPrime,
+      stopwatches: _stopwatches,
       drivetrain: widget.recorder.drivetrain,
       // Sans carte, aucune page ne publiera d'état : les mesures qui en
       // dépendent s'abstiennent au lieu d'attendre pour toujours.
@@ -2079,6 +2085,7 @@ class _RideShellPageState extends State<RideShellPage>
     );
     _web?.dispose();
     _wPrime?.dispose();
+    _stopwatches.dispose();
     _nav.dispose();
     _climbProfile.dispose();
     _stableClimb.dispose();

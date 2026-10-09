@@ -29,6 +29,7 @@ import '../blocks/weather_forecast_block.dart';
 import '../blocks/wind_block.dart';
 import '../blocks/lap_delta_block.dart';
 import '../blocks/fueling_block.dart';
+import '../blocks/stopwatch_block.dart';
 import '../blocks/resupply_block.dart';
 import '../blocks/radar_block.dart';
 import '../blocks/recording_block.dart';
@@ -470,6 +471,13 @@ class DashboardPage extends StatelessWidget {
             recorder: sources.recorder,
             color: lapDelta.color,
             textColor: lapDelta.textColor,
+          ),
+        final StopwatchBlock stopwatch => StopwatchCard(
+            controller: sources.stopwatches!.of(stopwatch.id),
+            label: stopwatch.label,
+            mode: stopwatch.mode,
+            color: stopwatch.color,
+            textColor: stopwatch.textColor,
           ),
         final FuelingBlock fueling => FuelingCard(
             recorder: sources.recorder,

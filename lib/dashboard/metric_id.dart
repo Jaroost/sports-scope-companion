@@ -15,6 +15,7 @@ import '../ride/nav_state.dart';
 import '../ride/route_climbs.dart';
 import '../ride/route_profile.dart';
 import '../ride/route_resupply.dart';
+import '../ride/stopwatch_registry.dart';
 import '../training/ride_load.dart';
 import '../training/training_budget_store.dart';
 import '../training/wprime_balance.dart';
@@ -974,6 +975,7 @@ class MetricSources {
     this.routeProfile,
     this.resupply,
     this.wPrime,
+    this.stopwatches,
     this.lap,
   });
 
@@ -1044,6 +1046,10 @@ class MetricSources {
   /// devinée. Ride-wide, jamais recadré sur un tour (comme [nav]).
   final WPrimeBalance? wPrime;
 
+  /// Les chronomètres de la sortie, par identité — voir [StopwatchBlock].
+  /// Nul seulement hors coquille (aperçu) : le composant se grise alors.
+  final StopwatchRegistry? stopwatches;
+
   /// Le tour affiché par une page Tours ([LapListPageSpec]), `null` partout
   /// ailleurs. Quand il est posé, [MetricId.read]/[MetricId.liveRangeOf]
   /// lisent leurs mesures cumulées sur **ce tour** plutôt que sur la sortie
@@ -1067,6 +1073,7 @@ class MetricSources {
         routeProfile: routeProfile,
         resupply: resupply,
         wPrime: wPrime,
+        stopwatches: stopwatches,
         lap: lap,
       );
 }

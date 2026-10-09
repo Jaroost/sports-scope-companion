@@ -129,6 +129,7 @@ sealed class DashboardBlock {
           textColor: textColor,
         ),
       'fueling' => FuelingBlock.parse(raw),
+      'stopwatch' => StopwatchBlock.parse(raw),
       'training_budget' => TrainingBudgetBlock(
           mode: _modeOf(raw['mode'], TrainingBudgetMode.values),
           color: color,
@@ -2012,6 +2013,71 @@ class FuelingBlock extends DashboardBlock {
 
   @override
   int get hashCode => Object.hash(carbsPerHour, intervalMin, color, textColor);
+}
+
+/// Un chronomètre : un bouton démarrer/arrêter (le même, qui bascule) et un
+/// bouton de remise à zéro.
+///
+/// Ne lit aucun capteur ni l'enregistreur : le chrono est à l'usage du
+/// cycliste (une pause café, un effort de 3 min, un feu rouge). Son état vit
+/// dans la coquille (`StopwatchRegistry`), indexé par [id] — sans quoi il
+/// repartirait de zéro à chaque changement de page.
+class StopwatchBlock extends DashboardBlock {
+  const StopwatchBlock({
+    this.id = defaultId,
+    this.label = '',
+    this.mode = StopwatchMode.full,
+    super.color,
+    super.textColor,
+  });
+
+  /// Identité du chrono : deux composants de même [id] montrent le même
+  /// chrono, deux [id] différents courent indépendamment.
+  final String id;
+
+  /// Titre affiché au-dessus du temps ; vide, pas de titre.
+  final String label;
+  final StopwatchMode mode;
+
+  static const defaultId = 'default';
+  static const maxLabelLength = 24;
+
+  static StopwatchBlock parse(Map<dynamic, dynamic> raw) {
+    final id = raw['id'];
+    final label = raw['label'];
+    return StopwatchBlock(
+      id: id is String && id.trim().isNotEmpty ? id.trim() : defaultId,
+      label: label is String ? label.trim() : '',
+      mode: DashboardBlock._modeOf(raw['mode'], StopwatchMode.values),
+      color: DashboardBlock._colorOf(raw, 'color'),
+      textColor: DashboardBlock._colorOf(raw, 'text_color'),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is StopwatchBlock &&
+      other.id == id &&
+      other.label == label &&
+      other.mode == mode &&
+      other.color == color &&
+      other.textColor == textColor;
+
+  @override
+  int get hashCode => Object.hash(id, label, mode, color, textColor);
+}
+
+enum StopwatchMode with BlockMode {
+  /// Le grand chiffre, le titre et deux gros boutons — mode par défaut.
+  full('full'),
+
+  /// Un chiffre plus petit et des boutons réduits, pour une case étroite.
+  compact('compact');
+
+  const StopwatchMode(this.key);
+
+  @override
+  final String key;
 }
 
 /// L'heure courante.

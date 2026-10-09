@@ -8,6 +8,7 @@ import '../blocks/altitude_profile_block.dart';
 import '../blocks/averages_block.dart';
 import '../blocks/climb_profile_block.dart';
 import '../blocks/fueling_block.dart';
+import '../blocks/stopwatch_block.dart';
 import '../blocks/lap_delta_block.dart';
 import '../blocks/lap_summary_block.dart';
 import '../blocks/resupply_block.dart';
@@ -470,6 +471,13 @@ class _LapListBodyState extends State<LapListBody> {
           recorder: widget.sources.recorder,
           color: lapDelta.color,
           textColor: lapDelta.textColor,
+        ),
+      final StopwatchBlock stopwatch => StopwatchCard(
+          controller: widget.sources.stopwatches!.of(stopwatch.id),
+          label: stopwatch.label,
+          mode: stopwatch.mode,
+          color: stopwatch.color,
+          textColor: stopwatch.textColor,
         ),
       final FuelingBlock fueling => FuelingCard(
           recorder: widget.sources.recorder,
