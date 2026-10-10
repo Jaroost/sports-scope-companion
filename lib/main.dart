@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'account/account_page.dart';
+import 'account/map_style_choice.dart';
 import 'account/companion_settings_page.dart';
 import 'account/rider_profile_store.dart';
 import 'training/training_budget_store.dart';
@@ -21,7 +22,6 @@ import 'devices/gatt_sniff_page.dart';
 import 'devices/known_devices_store.dart';
 import 'devices/sensor_status_strip.dart';
 import 'devices/sensors_page.dart';
-import 'drivetrain.dart';
 import 'navigation/handoff_exchange.dart';
 import 'navigation/screen_dimmer.dart';
 import 'navigation/navigation_picker_sheet.dart';
@@ -40,12 +40,12 @@ import 'recording/gps_source.dart';
 import 'recording/recording_card.dart';
 import 'recording/ride_recorder.dart';
 import 'recording/ride_store.dart';
+import 'recording/rides_sync_card.dart';
 import 'recording/rides_page.dart';
 import 'training_program/training_program.dart';
 import 'training_program/training_program_catalog_store.dart';
 import 'training_program/training_program_fetch.dart';
 import 'training_program/workout_picker_sheet.dart';
-import 'ui/metric_tile.dart';
 import 'ui/radar_card.dart';
 import 'update/update_card.dart';
 import 'update/update_checker.dart';
@@ -751,8 +751,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with RouteAware {
-  final _drivetrain = Drivetrain.road;
-
   var _adapterState = BluetoothAdapterState.unknown;
   StreamSubscription<BluetoothAdapterState>? _adapterSub;
 
@@ -770,14 +768,22 @@ class _HomePageState extends State<HomePage> with RouteAware {
     ));
   }
 
+  /// Incrémenté au retour de « Mes sorties » : on a pu y envoyer ou supprimer des sorties, la carte
+  /// de synchro de l'accueil relit alors le disque.
+  var _ridesRevision = 0;
+
   void _openRides() {
-    Navigator.of(context).push(MaterialPageRoute(
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(
       builder: (_) => RidesPage(
         store: widget.rides,
         recorder: _recorder,
         riderProfile: widget.riderProfile,
       ),
-    ));
+    ))
+        .then((_) {
+      if (mounted) setState(() => _ridesRevision++);
+    });
   }
 
   /// Le banc d'essai du radar. Sa place est ici et pas dans un écran caché : le
@@ -1033,7 +1039,19 @@ class _HomePageState extends State<HomePage> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sports Scope'),
+        // L'icône de l'appli devant le nom — la même que sur le lanceur (copie de
+        // `ic_launcher.png`, xxxhdpi, dans `assets/images/`).
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image.asset('assets/images/app_icon.png', width: 30, height: 30),
+            ),
+            const SizedBox(width: 10),
+            const Text('Sports Scope'),
+          ],
+        ),
         actions: [
           IconButton(
             onPressed: _openAccount,
@@ -1050,23 +1068,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
             tooltip: 'Compte',
           ),
           IconButton(
-            onPressed: _openRides,
-            icon: const Icon(Icons.route),
-            tooltip: 'Mes sorties',
-          ),
-          IconButton(
-            onPressed: _openSensors,
-            icon: const Icon(Icons.sensors),
-            tooltip: 'Capteurs',
-          ),
-          IconButton(
             onPressed: _openCompanionSettings,
             icon: const Icon(Icons.settings),
             tooltip: 'Réglages',
           ),
           // Bancs d'essai et journal : utiles en développement, pas au
           // quotidien — regroupés pour ne pas noyer les boutons qu'on touche
-          // à chaque sortie (Compte, Mes sorties, Capteurs).
+          // à chaque sortie (Compte).
           PopupMenuButton<VoidCallback>(
             icon: const Icon(Icons.bug_report_outlined),
             tooltip: 'Debug',
@@ -1193,6 +1201,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
           // navigateur — donc pas en pleine préparation de sortie.
           UpdateCard(checker: widget.updates),
           _dataSaverCard(),
+          _mapStyleCard(),
           const SizedBox(height: 12),
           // L'état des capteurs passe avant tout le reste : c'est la question
           // qu'on se pose au moment de partir, et la seule à laquelle il faut
@@ -1204,6 +1213,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
             onTap: _openSensors,
           ),
           const SizedBox(height: 12),
+          // Au-dessus de l'enregistrement : combien de sorties sont déjà sur le site, et de quoi
+          // envoyer le reste. Absente tant qu'il n'y a aucune sortie.
+          RidesSyncCard(
+            store: widget.rides,
+            recorder: _recorder,
+            onOpen: _openRides,
+            refreshToken: _ridesRevision,
+          ),
           // L'enregistrement passe avant les valeurs en direct : c'est le geste
           // qu'on cherche avant de partir, les mesures ne sont qu'un contrôle.
           RecordingCard(
@@ -1213,8 +1230,6 @@ class _HomePageState extends State<HomePage> with RouteAware {
             sensors: widget.settings.preset.sensors,
             lapSeries: widget.settings.preset.lapSeries,
           ),
-          const SizedBox(height: 12),
-          LiveValuesCard(hub: _hub, drivetrain: _drivetrain),
           const SizedBox(height: 12),
           RadarCard(hub: _hub),
         ],
@@ -1290,6 +1305,31 @@ class _HomePageState extends State<HomePage> with RouteAware {
             ),
           );
         },
+      );
+
+  /// Le fond de carte de la navigation, choisi **avant de partir** : un tap ouvre la liste des
+  /// fonds et l'écrit sur le compte (`changeMapStyle`) — le même choix que dans les réglages,
+  /// sans avoir à y aller. Reconstruit sur le magasin : le document arrive pendant que l'accueil
+  /// est affiché.
+  var _mapStyleSaving = false;
+
+  Widget _mapStyleCard() => ListenableBuilder(
+        listenable: widget.settings,
+        builder: (context, _) => Card(
+          child: ListTile(
+            leading: const Icon(Icons.map_outlined),
+            title: const Text('Fond de carte de navigation'),
+            subtitle: Text(mapStyleLabel(widget.settings)),
+            trailing: _mapStyleSaving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.chevron_right),
+            onTap: _mapStyleSaving
+                ? null
+                : () => changeMapStyle(context, widget.settings, onBusy: (busy) {
+                      if (mounted) setState(() => _mapStyleSaving = busy);
+                    }),
+          ),
+        ),
       );
 
   /// Interrupteur « économie de données » — voir `DataSaverStore`. Réglable

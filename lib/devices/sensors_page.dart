@@ -7,6 +7,8 @@ import '../ble/samples.dart';
 import '../ble/sensor_connection.dart';
 import '../ble/sensor_hub.dart';
 import '../ble/sensor_profile.dart';
+import '../drivetrain.dart';
+import '../ui/metric_tile.dart' show LiveValuesCard;
 import '../ui/power_calibration_dialog.dart';
 import '../ui/sensor_icons.dart';
 import 'device_linker.dart';
@@ -223,6 +225,10 @@ class _SensorsPageState extends State<SensorsPage> {
                 ),
               ),
             ),
+          // Les valeurs en direct vivent ici (elles étaient sur l'accueil) : c'est la page où
+          // l'on vérifie qu'un capteur parle — au-dessus de la liste, qu'on lit juste après.
+          LiveValuesCard(hub: _hub, drivetrain: Drivetrain.road),
+          const SizedBox(height: 16),
           _sectionTitle('Mes capteurs'),
           if (known.isEmpty)
             const Padding(

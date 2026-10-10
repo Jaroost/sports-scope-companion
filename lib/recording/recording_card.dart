@@ -6,7 +6,6 @@ import '../ui/formats.dart';
 import 'gps_source.dart';
 import 'ride_recorder.dart';
 import 'ride_store.dart';
-import 'rides_page.dart';
 
 /// Le bandeau d'enregistrement : démarrer, mettre en pause, arrêter.
 ///
@@ -164,26 +163,9 @@ class RecordingCard extends StatelessWidget {
     }
   }
 
+  // Aucun message à l'arrêt : la sortie apparaît d'elle-même dans « Mes sorties », et le
+  // toast « Sortie enregistrée » ne faisait que recouvrir le bas de l'accueil.
   Future<void> _stop(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
-    final session = await recorder.stop();
-    if (session == null) return;
-
-    messenger.showSnackBar(SnackBar(
-      content: Text('Sortie enregistrée : ${formatDistance(session.distanceM)} '
-          'en ${formatDuration(session.moving)}'),
-      action: SnackBarAction(
-        label: 'Exporter',
-        onPressed: () => navigator.push(MaterialPageRoute(
-          builder: (_) => RidesPage(
-            store: store,
-            recorder: recorder,
-            riderProfile: riderProfile,
-          ),
-        )),
-      ),
-    ));
+    await recorder.stop();
   }
 }

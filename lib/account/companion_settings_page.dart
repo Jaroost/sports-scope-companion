@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../dashboard/companion_settings_store.dart';
-import '../ui/map_style_picker.dart';
 import 'companion_settings_write.dart';
-import 'map_style_write.dart';
+import 'map_style_choice.dart';
 
 /// Réglages globaux du compte (pas ceux d'un profil de sortie) : deviner un col
 /// en navigation libre, et le fond de carte de la navigation guidée.
@@ -61,53 +60,6 @@ class _CompanionSettingsPageState extends State<CompanionSettingsPage> {
     }
   }
 
-  /// Ouvre le fond de carte choisi. La liste vient du document en cache —
-  /// vide contre un site plus ancien que ce réglage — auquel cas on le dit
-  /// plutôt que d'ouvrir une boîte sans rien dedans.
-  Future<void> _pickMapStyle() async {
-    final styles = widget.settings.mapStyles;
-    if (styles.isEmpty) {
-      _snack('Réglage pas encore disponible — connecte-toi (bouton Compte) '
-          'et relance l\'appli.');
-      return;
-    }
-
-    final current = widget.settings.mapStyle;
-    final chosen = await pickMapStyle(context, styles: styles, current: current);
-    if (chosen == null || chosen == current) return;
-    await _setMapStyle(chosen);
-  }
-
-  Future<void> _setMapStyle(String id) async {
-    setState(() => _saving = true);
-    final result = await const MapStyleWrite().run(id);
-    if (!mounted) return;
-    setState(() => _saving = false);
-
-    switch (result.status) {
-      case MapStyleWriteStatus.ok:
-        // Le fond RENVOYÉ (celui que le serveur a retenu), pas celui envoyé —
-        // même contrat que le document complet de CompanionSettingsWrite.
-        if (result.id != null) await widget.settings.recordMapStyle(result.id!);
-      case MapStyleWriteStatus.signedOut:
-        _snack('Connecte-toi (bouton Compte) pour changer ce réglage.');
-      case MapStyleWriteStatus.failed:
-        _snack('Échec de l\'enregistrement — réessaie avec du réseau.');
-    }
-  }
-
-  /// Libellé affiché sous la ligne « Fond de carte ». Repli sur l'id brut si
-  /// le catalogue ne le connaît pas encore (document tout juste arrivé, une
-  /// version plus récente du site a ajouté ce fond) plutôt que de le taire.
-  String _mapStyleLabel() {
-    final id = widget.settings.mapStyle;
-    if (id == null) return 'Pas encore reçu du site';
-    for (final style in widget.settings.mapStyles) {
-      if (style.id == id) return style.label;
-    }
-    return id;
-  }
-
   void _snack(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
@@ -133,8 +85,12 @@ class _CompanionSettingsPageState extends State<CompanionSettingsPage> {
             ListTile(
               leading: const Icon(Icons.map_outlined),
               title: const Text('Fond de carte de navigation'),
-              subtitle: Text(_mapStyleLabel()),
-              onTap: _saving ? null : _pickMapStyle,
+              subtitle: Text(mapStyleLabel(widget.settings)),
+              onTap: _saving
+                  ? null
+                  : () => changeMapStyle(context, widget.settings, onBusy: (busy) {
+                        if (mounted) setState(() => _saving = busy);
+                      }),
             ),
             if (_saving)
               const Padding(

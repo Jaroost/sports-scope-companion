@@ -36,6 +36,11 @@ class RideStore {
 
   static const _metaName = 'session.json';
   static const _pointsName = 'points.jsonl';
+  static const _previewName = 'preview.json';
+
+  /// Nombre de sommets gardés pour l'aperçu d'une sortie dans la liste : de quoi en dessiner
+  /// la forme dans une pastille de quelques centimètres, sans relire 20 000 points.
+  static const _previewVertices = 80;
 
   Directory directoryFor(String id) => Directory(p.join(root.path, id));
 
@@ -72,6 +77,20 @@ class RideStore {
       // Perdre le résumé ne doit pas interrompre une sortie en cours : les
       // points, eux, continuent d'être écrits.
       debugPrint('[rides] résumé non écrit (${session.id}) : $e');
+    }
+  }
+
+  /// Note qu'une sortie est partie sur le site. Relit le résumé **sur le disque** plutôt que
+  /// de repartir d'une copie en mémoire : la sortie qui roule réécrit le sien en permanence.
+  Future<void> markSynced(String id, {DateTime? at}) async {
+    try {
+      final file = _metaFileFor(id);
+      if (!await file.exists()) return;
+      final session = RideSession.fromJson(jsonDecode(await file.readAsString()));
+      if (session == null) return;
+      await save(session.copyWith(syncedAt: (at ?? DateTime.now()).toUtc()));
+    } catch (e) {
+      debugPrint('[rides] synchro non notée ($id) : $e');
     }
   }
 
@@ -138,6 +157,51 @@ class RideStore {
       }
     }
     return points;
+  }
+
+  /// La forme d'une sortie, en `[lat, lng]` réduits à ~[_previewVertices] sommets — pour la
+  /// petite pastille de la liste « Mes sorties ».
+  ///
+  /// Relire les points d'une sortie coûte (un point par seconde, une sortie de 6 h en a plus de
+  /// 20 000) : la forme réduite est donc **rangée à côté de la sortie** (`preview.json`) et relue
+  /// de là ensuite. [cache] n'est vrai que pour une sortie terminée — celle qui roule encore
+  /// grandit à chaque tic, on la recalcule plutôt que de figer un tracé en retard.
+  Future<List<List<double>>> preview(String id, {required bool cache}) async {
+    final stored = File(p.join(root.path, id, _previewName));
+    if (cache) {
+      try {
+        if (await stored.exists()) {
+          final decoded = jsonDecode(await stored.readAsString());
+          if (decoded is List) {
+            return [
+              for (final pair in decoded)
+                if (pair is List && pair.length == 2 && pair[0] is num && pair[1] is num)
+                  [(pair[0] as num).toDouble(), (pair[1] as num).toDouble()],
+            ];
+          }
+        }
+      } catch (_) {
+        // Un aperçu illisible se recalcule : rien de précieux dedans.
+      }
+    }
+
+    final located = [
+      for (final point in await points(id))
+        if (point.lat != null && point.lng != null) [point.lat!, point.lng!],
+    ];
+    final step = located.length <= _previewVertices ? 1 : (located.length - 1) / (_previewVertices - 1);
+    final reduced = located.length <= _previewVertices
+        ? located
+        : [for (var i = 0; i < _previewVertices; i++) located[(i * step).round()]];
+
+    if (cache && reduced.length >= 2) {
+      try {
+        await stored.writeAsString(jsonEncode(reduced));
+      } catch (e) {
+        debugPrint('[rides] aperçu non écrit ($id) : $e');
+      }
+    }
+    return reduced;
   }
 
   /// Ouvre le fichier de points en ajout.

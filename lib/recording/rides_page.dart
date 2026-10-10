@@ -12,6 +12,8 @@ import 'ride_detail_page.dart';
 import 'ride_recorder.dart';
 import 'ride_session.dart';
 import 'ride_store.dart';
+import 'ride_sync.dart';
+import 'ride_trace_preview.dart';
 import 'ride_upload.dart';
 
 /// Les sorties enregistrées : ce qu'on a, et comment le sortir de l'appli.
@@ -137,7 +139,7 @@ class _RidesPageState extends State<RidesPage> {
   /// jetable — la source reste le JSONL de la sortie, qu'on peut réexporter
   /// autant de fois qu'on veut.
   Future<void> _export(RideSession session) async {
-    final sport = await _pickSport();
+    final sport = await pickRideSport(context);
     if (sport == null) return;
 
     setState(() => _busyId = session.id);
@@ -166,12 +168,43 @@ class _RidesPageState extends State<RidesPage> {
     }
   }
 
+  double? _syncProgress;
+
+  /// Envoie d'un coup toutes les sorties pas encore synchronisées (celle qui roule est
+  /// exclue). Un seul choix de sport pour le lot : l'appli ne sait pas ce qu'on a roulé.
+  Future<void> _syncAll() async {
+    final pending = pendingRides(_sessions ?? const [], activeId: widget.recorder.session?.id);
+    if (pending.isEmpty) {
+      _toast('Toutes les sorties sont déjà synchronisées.');
+      return;
+    }
+    final sport = await pickRideSport(
+      context,
+      title: pending.length > 1 ? 'Sport de ces ${pending.length} sorties' : 'Sport de cette sortie',
+    );
+    if (sport == null || !mounted) return;
+
+    setState(() => _syncProgress = 0);
+    final report = await syncRides(
+      store: widget.store,
+      pending: pending,
+      sport: sport,
+      onProgress: (done, total) {
+        if (mounted) setState(() => _syncProgress = total == 0 ? 1 : done / total);
+      },
+    );
+    if (!mounted) return;
+    setState(() => _syncProgress = null);
+    await _reload();
+    _toast(report.message);
+  }
+
   /// Envoie la sortie directement à sports-scope, sans passer par un fichier.
   ///
   /// Même sélecteur de sport que l'export : l'appli ne sait toujours pas ce
   /// qu'on a roulé, seulement les capteurs et le GPS.
   Future<void> _upload(RideSession session) async {
-    final sport = await _pickSport();
+    final sport = await pickRideSport(context);
     if (sport == null) return;
 
     setState(() => _busyId = session.id);
@@ -182,6 +215,8 @@ class _RidesPageState extends State<RidesPage> {
       final result = await const RideUploadFetch().run(payload);
       switch (result.status) {
         case RideUploadStatus.ok:
+          await widget.store.markSynced(session.id);
+          await _reload();
           _toast('Sortie envoyée sur sports-scope.');
         case RideUploadStatus.signedOut:
           _toast('Connecte-toi sur sports-scope (onglet Compte) avant d\'envoyer.');
@@ -196,37 +231,6 @@ class _RidesPageState extends State<RidesPage> {
       if (mounted) setState(() => _busyId = null);
     }
   }
-
-  /// Ce que la sortie était vraiment, pour le `.fit` — l'appli ne l'a jamais su
-  /// pendant l'enregistrement (voir `FitSport`). `null` si l'utilisateur ferme
-  /// la boîte sans choisir, ce qui annule l'export plutôt que de deviner.
-  Future<FitSport?> _pickSport() => showDialog<FitSport>(
-        context: context,
-        builder: (dialogContext) => SimpleDialog(
-          title: const Text('Sport de cette sortie'),
-          children: [
-            _sportOption(dialogContext, FitSport.cycling, Icons.directions_bike),
-            _sportOption(dialogContext, FitSport.mtb, Icons.terrain),
-            _sportOption(dialogContext, FitSport.hiking, Icons.hiking),
-          ],
-        ),
-      );
-
-  Widget _sportOption(
-    BuildContext dialogContext,
-    FitSport sport,
-    IconData icon,
-  ) =>
-      SimpleDialogOption(
-        onPressed: () => Navigator.of(dialogContext).pop(sport),
-        child: Row(
-          children: [
-            Icon(icon),
-            const SizedBox(width: 12),
-            Text(sport.label),
-          ],
-        ),
-      );
 
   Future<void> _delete(RideSession session) async {
     final confirmed = await showDialog<bool>(
@@ -351,6 +355,21 @@ class _RidesPageState extends State<RidesPage> {
           : AppBar(
               title: const Text('Mes sorties'),
               actions: [
+                // Envoie tout ce qui n'est pas encore sur le site. Un cercle de progression
+                // pendant l'envoi ; grisé quand tout est déjà synchronisé.
+                if (_syncProgress != null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                else
+                  IconButton(
+                    onPressed: pendingRides(sessions ?? const [], activeId: widget.recorder.session?.id).isEmpty
+                        ? null
+                        : _syncAll,
+                    icon: const Icon(Icons.cloud_upload),
+                    tooltip: 'Synchroniser avec le site',
+                  ),
                 IconButton(
                   onPressed: _deletable(sessions ?? const []).isEmpty
                       ? null
@@ -409,10 +428,7 @@ class _RidesPageState extends State<RidesPage> {
               value: selected,
               onChanged: (_) => _toggleSelected(session),
             )
-          : Icon(
-              active ? Icons.fiber_manual_record : Icons.route,
-              color: active ? Colors.red : null,
-            ),
+          : RideTracePreview(store: widget.store, session: session),
       title: Text(formatDateTime(session.startedAt)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,6 +436,11 @@ class _RidesPageState extends State<RidesPage> {
           Text('${formatDuration(session.moving)} · '
               '${formatDistance(session.distanceM)} · '
               '${session.pointCount} points'),
+          if (session.isSynced)
+            const Text.rich(TextSpan(children: [
+              WidgetSpan(child: Icon(Icons.cloud_done, size: 14, color: Colors.teal)),
+              TextSpan(text: ' synchronisée', style: TextStyle(color: Colors.teal)),
+            ])),
           if (active)
             const Text('enregistrement en cours',
                 style: TextStyle(color: Colors.red))
@@ -431,7 +452,7 @@ class _RidesPageState extends State<RidesPage> {
                 style: TextStyle(fontStyle: FontStyle.italic)),
         ],
       ),
-      isThreeLine: active || !session.isFinished,
+      isThreeLine: active || !session.isFinished || session.isSynced,
       // En mode sélection, plus de menu par tuile : la seule action est la
       // suppression groupée, dans la barre du haut.
       trailing: _selecting

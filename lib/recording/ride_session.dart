@@ -12,6 +12,7 @@ class RideSession {
     this.pointCount = 0,
     this.distanceM = 0,
     this.movingSeconds = 0,
+    this.syncedAt,
   });
 
   /// Identifiant *et* nom de dossier : l'instant de départ en UTC, sans les
@@ -31,6 +32,13 @@ class RideSession {
   /// Secondes effectivement enregistrées, pauses exclues. C'est le
   /// `total_timer_time` du `.fit`, à distinguer du temps écoulé.
   final int movingSeconds;
+
+  /// Quand la sortie a été envoyée sur le site (`/api/imported_activities`), `null` tant
+  /// qu'elle ne l'a pas été. C'est ce qui fait compter « x/y synchronisées » sur l'accueil
+  /// et évite de renvoyer deux fois la même sortie.
+  final DateTime? syncedAt;
+
+  bool get isSynced => syncedAt != null;
 
   bool get isFinished => endedAt != null;
 
@@ -54,6 +62,7 @@ class RideSession {
     int? pointCount,
     double? distanceM,
     int? movingSeconds,
+    DateTime? syncedAt,
   }) {
     return RideSession(
       id: id,
@@ -62,6 +71,7 @@ class RideSession {
       pointCount: pointCount ?? this.pointCount,
       distanceM: distanceM ?? this.distanceM,
       movingSeconds: movingSeconds ?? this.movingSeconds,
+      syncedAt: syncedAt ?? this.syncedAt,
     );
   }
 
@@ -72,6 +82,7 @@ class RideSession {
         'pointCount': pointCount,
         'distanceM': distanceM,
         'movingSeconds': movingSeconds,
+        'syncedAt': syncedAt?.toUtc().toIso8601String(),
       };
 
   static RideSession? fromJson(Object? json) {
@@ -95,6 +106,9 @@ class RideSession {
       movingSeconds: json['movingSeconds'] is num
           ? (json['movingSeconds'] as num).round()
           : 0,
+      syncedAt: json['syncedAt'] is String
+          ? DateTime.tryParse(json['syncedAt'] as String)?.toUtc()
+          : null,
     );
   }
 
