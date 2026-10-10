@@ -122,6 +122,7 @@ class WorkoutMilestone {
     required this.icon,
     required this.color,
     required this.textColor,
+    this.optional = false,
     required this.targetPower,
     required this.minPower,
     required this.maxPower,
@@ -154,6 +155,11 @@ class WorkoutMilestone {
   final Color? color;
   final Color? textColor;
 
+  /// Le bloc peut être sauté d'un grand glissé (l'échauffement, par exemple) —
+  /// `optional` côté site. Absent vaut `false` : un bloc d'un document plus ancien
+  /// que l'appli reste obligatoire, jamais sauté par mégarde.
+  final bool optional;
+
   /// Cible + bornes de ce step pour les quatre mesures en direct, réglées
   /// dans l'éditeur du site (`TrainingProgram::TARGET_FIELDS`, même unités :
   /// W, bpm, tr/min, km/h). `target*` n'est pas encore affiché ici — seuls
@@ -183,6 +189,7 @@ class WorkoutMilestone {
       icon: WorkoutMilestoneIcon.parse(raw['icon']),
       color: _colorOf(raw['color']),
       textColor: _colorOf(raw['text_color']),
+      optional: raw['optional'] == true,
       targetPower: _numOf(raw['target_power']),
       minPower: _numOf(raw['min_power']),
       maxPower: _numOf(raw['max_power']),
@@ -280,6 +287,16 @@ class TrainingProgram {
       current = milestone;
     }
     return current;
+  }
+
+  /// Combien de secondes il reste du tronçon en cours **s'il est optionnel**, `null`
+  /// sinon (obligatoire, ou programme terminé). C'est de combien avancer l'horloge du
+  /// programme pour sauter ce bloc ([RideRecorder.skipWorkoutBlock]).
+  int? skippableSecondsAt(Duration elapsed) {
+    final current = milestoneAt(elapsed);
+    final remaining = remainingAt(elapsed);
+    if (current == null || remaining == null || !current.optional) return null;
+    return remaining.inSeconds;
   }
 
   /// Le temps avant le prochain jalon, `null` une fois le dernier dépassé

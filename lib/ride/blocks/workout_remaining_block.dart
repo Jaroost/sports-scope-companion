@@ -7,6 +7,7 @@ import '../../training_program/training_program.dart';
 import '../../ui/formats.dart';
 import '../../ui/zone_colors.dart';
 import 'block_card.dart';
+import '../widgets/workout_skip_swipe.dart';
 
 /// Le temps restant avant le prochain jalon du programme d'entraînement actif.
 ///
@@ -43,70 +44,71 @@ class WorkoutRemainingCard extends StatelessWidget {
   static const _finished = 'Terminé';
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: recorder,
-        builder: (context, _) {
-          final program = recorder.activeWorkout;
-          final elapsed = recorder.workoutElapsed;
-          final milestone = program != null && elapsed != null
-              ? (upcoming ? program.nextMilestoneAt(elapsed) : program.milestoneAt(elapsed))
-              : null;
-          final remaining = program != null && elapsed != null
-              ? (upcoming ? program.nextSegmentDurationAt(elapsed) : program.remainingAt(elapsed))
-              : null;
+  Widget build(BuildContext context) => WorkoutSkipSwipe(
+    recorder: recorder,
+    child: ListenableBuilder(
+      listenable: recorder,
+      builder: (context, _) {
+        final program = recorder.activeWorkout;
+        final elapsed = recorder.workoutElapsed;
+        final milestone = program != null && elapsed != null
+            ? (upcoming ? program.nextMilestoneAt(elapsed) : program.milestoneAt(elapsed))
+            : null;
+        final remaining = program != null && elapsed != null
+            ? (upcoming ? program.nextSegmentDurationAt(elapsed) : program.remainingAt(elapsed))
+            : null;
 
-          final background = color ?? milestone?.color;
-          final ink = textColor ??
-              milestone?.textColor ??
-              (background == null ? Colors.white : foregroundOf(background));
-          const metrics = BlockMetrics.natural;
+        final background = color ?? milestone?.color;
+        final ink = textColor ?? milestone?.textColor ?? (background == null ? Colors.white : foregroundOf(background));
+        const metrics = BlockMetrics.natural;
 
-          // `upcoming` n'a pas de « Terminé » : ce tronçon n'a pas commencé,
-          // il n'y a rien à annoncer de fini — juste un tiret quand sa durée
-          // n'est pas connue (dernier de la timeline, programme absent).
-          final String label;
-          if (program == null) {
-            label = '—';
-          } else if (remaining == null) {
-            label = upcoming ? '—' : _finished;
-          } else {
-            label = formatDuration(remaining);
-          }
+        // `upcoming` n'a pas de « Terminé » : ce tronçon n'a pas commencé,
+        // il n'y a rien à annoncer de fini — juste un tiret quand sa durée
+        // n'est pas connue (dernier de la timeline, programme absent).
+        final String label;
+        if (program == null) {
+          label = '—';
+        } else if (remaining == null) {
+          label = upcoming ? '—' : _finished;
+        } else {
+          label = formatDuration(remaining);
+        }
 
-          return BlockSurface(
-            background: background,
-            child: SizedBox(
-              width: _naturalWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    (upcoming ? _upcomingTitle : _title).toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: metrics.titleSize),
-                  ),
-                  SizedBox(height: metrics.gap * 0.6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      FaIcon(_icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
-                      SizedBox(width: metrics.gap * 0.6),
-                      Flexible(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
-                        ),
+        return BlockSurface(
+          background: background,
+          child: SizedBox(
+            width: _naturalWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  (upcoming ? _upcomingTitle : _title).toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: metrics.titleSize),
+                ),
+                SizedBox(height: metrics.gap * 0.6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    FaIcon(_icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
+                    SizedBox(width: metrics.gap * 0.6),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          );
-        },
-      );
+          ),
+        );
+      },
+    ),
+  );
 }

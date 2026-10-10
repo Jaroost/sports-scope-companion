@@ -9,6 +9,7 @@ import '../../training_program/training_program.dart';
 import '../../ui/formats.dart';
 import '../../ui/zone_colors.dart';
 import 'block_card.dart';
+import '../widgets/workout_skip_swipe.dart';
 
 /// Le tronçon d'entraînement en cours et le temps restant avant le prochain
 /// jalon, dans une seule carte — [WorkoutSegmentCard] et
@@ -54,101 +55,102 @@ class WorkoutStatusCard extends StatelessWidget {
   static const _finished = 'Terminé';
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: recorder,
-        builder: (context, _) {
-          final program = recorder.activeWorkout;
-          final elapsed = recorder.workoutElapsed;
-          final milestone = program != null && elapsed != null
-              ? (upcoming ? program.nextMilestoneAt(elapsed) : program.milestoneAt(elapsed))
-              : null;
-          final remaining = program != null && elapsed != null
-              ? (upcoming ? program.nextSegmentDurationAt(elapsed) : program.remainingAt(elapsed))
-              : null;
+  Widget build(BuildContext context) => WorkoutSkipSwipe(
+    recorder: recorder,
+    child: ListenableBuilder(
+      listenable: recorder,
+      builder: (context, _) {
+        final program = recorder.activeWorkout;
+        final elapsed = recorder.workoutElapsed;
+        final milestone = program != null && elapsed != null
+            ? (upcoming ? program.nextMilestoneAt(elapsed) : program.milestoneAt(elapsed))
+            : null;
+        final remaining = program != null && elapsed != null
+            ? (upcoming ? program.nextSegmentDurationAt(elapsed) : program.remainingAt(elapsed))
+            : null;
 
-          final background = color ?? milestone?.color;
-          final ink = textColor ??
-              milestone?.textColor ??
-              (background == null ? Colors.white : foregroundOf(background));
-          const metrics = BlockMetrics.natural;
+        final background = color ?? milestone?.color;
+        final ink = textColor ?? milestone?.textColor ?? (background == null ? Colors.white : foregroundOf(background));
+        const metrics = BlockMetrics.natural;
 
-          final name = milestone?.segmentName;
-          final segmentLabel = (name == null || name.isEmpty) ? '—' : name;
-          // `upcoming` n'a pas de « Terminé » : ce tronçon n'a pas commencé,
-          // rien à annoncer de fini — juste un tiret quand sa durée n'est pas
-          // connue (dernier de la timeline, programme absent).
-          final String remainingLabel;
-          if (program == null) {
-            remainingLabel = '—';
-          } else if (remaining == null) {
-            remainingLabel = upcoming ? '—' : _finished;
-          } else {
-            remainingLabel = formatDuration(remaining);
-          }
-          final icon = workoutMilestoneIconFor(milestone?.icon);
+        final name = milestone?.segmentName;
+        final segmentLabel = (name == null || name.isEmpty) ? '—' : name;
+        // `upcoming` n'a pas de « Terminé » : ce tronçon n'a pas commencé,
+        // rien à annoncer de fini — juste un tiret quand sa durée n'est pas
+        // connue (dernier de la timeline, programme absent).
+        final String remainingLabel;
+        if (program == null) {
+          remainingLabel = '—';
+        } else if (remaining == null) {
+          remainingLabel = upcoming ? '—' : _finished;
+        } else {
+          remainingLabel = formatDuration(remaining);
+        }
+        final icon = workoutMilestoneIconFor(milestone?.icon);
 
-          return BlockSurface(
-            background: background,
-            child: SizedBox(
-              width: mode == WorkoutStatusMode.line ? _lineWidth : _naturalWidth,
-              child: mode == WorkoutStatusMode.line
-                  ? _line(icon, segmentLabel, remainingLabel, ink, metrics)
-                  : _full(icon, segmentLabel, remainingLabel, ink, metrics),
-            ),
-          );
-        },
-      );
+        return BlockSurface(
+          background: background,
+          child: SizedBox(
+            width: mode == WorkoutStatusMode.line ? _lineWidth : _naturalWidth,
+            child: mode == WorkoutStatusMode.line
+                ? _line(icon, segmentLabel, remainingLabel, ink, metrics)
+                : _full(icon, segmentLabel, remainingLabel, ink, metrics),
+          ),
+        );
+      },
+    ),
+  );
 
   /// [WorkoutStatusMode.full] : le tronçon, puis le temps restant, chacun sa
   /// ligne — mêmes rangées que [WorkoutSegmentCard]/[WorkoutRemainingCard].
   Widget _full(FaIconData icon, String segment, String remaining, Color ink, BlockMetrics metrics) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _row(icon, segment, ink, metrics),
-          SizedBox(height: metrics.gap * 0.6),
-          _row(FontAwesomeIcons.stopwatch, remaining, ink, metrics),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _row(icon, segment, ink, metrics),
+      SizedBox(height: metrics.gap * 0.6),
+      _row(FontAwesomeIcons.stopwatch, remaining, ink, metrics),
+    ],
+  );
 
   /// [WorkoutStatusMode.line] : icône, nom du tronçon et temps restant sur
   /// une seule ligne — le nom cède la place en premier (`Expanded` +
   /// ellipse), le temps ne tronque jamais.
   Widget _line(FaIconData icon, String segment, String remaining, Color ink, BlockMetrics metrics) => Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          FaIcon(icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
-          SizedBox(width: metrics.gap * 0.6),
-          Expanded(
-            child: Text(
-              segment,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
-            ),
-          ),
-          SizedBox(width: metrics.gap),
-          Text(
-            remaining,
-            maxLines: 1,
-            style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      FaIcon(icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
+      SizedBox(width: metrics.gap * 0.6),
+      Expanded(
+        child: Text(
+          segment,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
+        ),
+      ),
+      SizedBox(width: metrics.gap),
+      Text(
+        remaining,
+        maxLines: 1,
+        style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
+      ),
+    ],
+  );
 
   Widget _row(FaIconData icon, String label, Color ink, BlockMetrics metrics) => Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          FaIcon(icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
-          SizedBox(width: metrics.gap * 0.6),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      FaIcon(icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
+      SizedBox(width: metrics.gap * 0.6),
+      Expanded(
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
+        ),
+      ),
+    ],
+  );
 }

@@ -6,6 +6,7 @@ import '../../dashboard/ride_preset.dart' show BandWorkoutMode;
 import '../../recording/ride_recorder.dart';
 import '../../ui/formats.dart';
 import '../../ui/zone_colors.dart';
+import 'workout_skip_swipe.dart';
 
 /// Une case de bandeau ou d'encoche dérivée du tronçon d'entraînement en
 /// cours — même source que [WorkoutSegmentCard]/[WorkoutRemainingCard]
@@ -61,119 +62,121 @@ class WorkoutBandTile extends StatelessWidget {
   static const _finished = 'Terminé';
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: recorder,
-        builder: (context, _) {
-          final program = recorder.activeWorkout;
-          final elapsed = recorder.workoutElapsed;
-          final milestone = program != null && elapsed != null
-              ? (upcoming ? program.nextMilestoneAt(elapsed) : program.milestoneAt(elapsed))
-              : null;
-          final remaining = program != null && elapsed != null
-              ? (upcoming ? program.nextSegmentDurationAt(elapsed) : program.remainingAt(elapsed))
-              : null;
+  Widget build(BuildContext context) => WorkoutSkipSwipe(
+    recorder: recorder,
+    child: ListenableBuilder(
+      listenable: recorder,
+      builder: (context, _) {
+        final program = recorder.activeWorkout;
+        final elapsed = recorder.workoutElapsed;
+        final milestone = program != null && elapsed != null
+            ? (upcoming ? program.nextMilestoneAt(elapsed) : program.milestoneAt(elapsed))
+            : null;
+        final remaining = program != null && elapsed != null
+            ? (upcoming ? program.nextSegmentDurationAt(elapsed) : program.remainingAt(elapsed))
+            : null;
 
-          final zoneColor = milestone?.color ?? color;
-          final foreground =
-              milestone?.textColor ?? (zoneColor == null ? Colors.white : foregroundOf(zoneColor));
+        final zoneColor = milestone?.color ?? color;
+        final foreground = milestone?.textColor ?? (zoneColor == null ? Colors.white : foregroundOf(zoneColor));
 
-          final icon = workoutMilestoneIconFor(milestone?.icon);
+        final icon = workoutMilestoneIconFor(milestone?.icon);
 
-          final segmentName = milestone?.segmentName;
-          final segmentLabel = (segmentName == null || segmentName.isEmpty) ? '—' : segmentName;
-          // `upcoming` n'a pas de « Terminé » : ce tronçon n'a pas commencé,
-          // il n'y a rien à annoncer de fini — juste un tiret quand sa durée
-          // n'est pas connue (dernier de la timeline, programme absent).
-          final remainingLabel = program == null
-              ? '—'
-              : (remaining == null ? (upcoming ? '—' : _finished) : formatDuration(remaining));
+        final segmentName = milestone?.segmentName;
+        final segmentLabel = (segmentName == null || segmentName.isEmpty) ? '—' : segmentName;
+        // `upcoming` n'a pas de « Terminé » : ce tronçon n'a pas commencé,
+        // il n'y a rien à annoncer de fini — juste un tiret quand sa durée
+        // n'est pas connue (dernier de la timeline, programme absent).
+        final remainingLabel = program == null
+            ? '—'
+            : (remaining == null ? (upcoming ? '—' : _finished) : formatDuration(remaining));
 
-          final content = switch (mode) {
-            BandWorkoutMode.combo => _combo(icon, remainingLabel, foreground),
-            BandWorkoutMode.line => _line(icon, segmentLabel, remainingLabel, foreground),
-            BandWorkoutMode.segment => _iconValue(icon, segmentLabel, foreground),
-            BandWorkoutMode.remaining => _iconValue(icon, remainingLabel, foreground),
-            BandWorkoutMode.icon => _iconOnly(icon, foreground),
-          };
+        final content = switch (mode) {
+          BandWorkoutMode.combo => _combo(icon, remainingLabel, foreground),
+          BandWorkoutMode.line => _line(icon, segmentLabel, remainingLabel, foreground),
+          BandWorkoutMode.segment => _iconValue(icon, segmentLabel, foreground),
+          BandWorkoutMode.remaining => _iconValue(icon, remainingLabel, foreground),
+          BandWorkoutMode.icon => _iconOnly(icon, foreground),
+        };
 
-          final surface = zoneColor ?? altBackground;
-          if (surface == null) return content;
+        final surface = zoneColor ?? altBackground;
+        if (surface == null) return content;
 
-          return Container(
-            margin: const EdgeInsets.fromLTRB(2, 3, 2, 3),
-            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(6)),
-            child: content,
-          );
-        },
-      );
+        return Container(
+          margin: const EdgeInsets.fromLTRB(2, 3, 2, 3),
+          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(6)),
+          child: content,
+        );
+      },
+    ),
+  );
 
   /// [BandWorkoutMode.combo] : une seule ligne, icône du tronçon et compte à
   /// rebours — pas de titre séparé, la case n'a la place que pour l'un des
   /// deux textes mais montre les deux informations d'un coup d'œil.
   Widget _combo(FaIconData icon, String remaining, Color foreground) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: _fit([
-          FaIcon(icon, size: 18, color: foreground.withValues(alpha: 0.85)),
-          const SizedBox(width: 6),
-          Text(
-            remaining,
-            maxLines: 1,
-            style: TextStyle(color: foreground, fontSize: 22, fontWeight: FontWeight.w500),
-          ),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: _fit([
+      FaIcon(icon, size: 18, color: foreground.withValues(alpha: 0.85)),
+      const SizedBox(width: 6),
+      Text(
+        remaining,
+        maxLines: 1,
+        style: TextStyle(color: foreground, fontSize: 22, fontWeight: FontWeight.w500),
+      ),
+    ]),
+  );
 
   /// [BandWorkoutMode.line] : icône, nom du tronçon et compte à rebours, tout
   /// sur une seule ligne — même contenu que [WorkoutBadge], au langage
   /// visuel du bandeau plutôt que d'une pastille flottante.
   Widget _line(FaIconData icon, String segment, String remaining, Color foreground) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: _fit([
-          FaIcon(icon, size: 16, color: foreground.withValues(alpha: 0.85)),
-          const SizedBox(width: 6),
-          Text(
-            segment,
-            maxLines: 1,
-            style: TextStyle(color: foreground, fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            remaining,
-            maxLines: 1,
-            style: TextStyle(color: foreground, fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: _fit([
+      FaIcon(icon, size: 16, color: foreground.withValues(alpha: 0.85)),
+      const SizedBox(width: 6),
+      Text(
+        segment,
+        maxLines: 1,
+        style: TextStyle(color: foreground, fontSize: 18, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        remaining,
+        maxLines: 1,
+        style: TextStyle(color: foreground, fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+    ]),
+  );
 
   /// [BandWorkoutMode.segment]/[BandWorkoutMode.remaining] : l'icône et la
   /// valeur seules, sans libellé — l'icône du tronçon (la même dans les deux
   /// modes) porte déjà la distinction entre les deux.
   Widget _iconValue(FaIconData icon, String value, Color foreground) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: _fit([
-          FaIcon(icon, size: 14, color: foreground.withValues(alpha: 0.85)),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(color: foreground, fontSize: 20, fontWeight: FontWeight.w500),
-          ),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: _fit([
+      FaIcon(icon, size: 14, color: foreground.withValues(alpha: 0.85)),
+      const SizedBox(width: 4),
+      Text(
+        value,
+        maxLines: 1,
+        style: TextStyle(color: foreground, fontSize: 20, fontWeight: FontWeight.w500),
+      ),
+    ]),
+  );
 
   /// [BandWorkoutMode.icon] : l'icône du tronçon seule, sans aucun texte —
   /// pour la case qui n'a la place que pour un symbole.
   Widget _iconOnly(FaIconData icon, Color foreground) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: _fit([FaIcon(icon, size: 22, color: foreground.withValues(alpha: 0.85))]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: _fit([FaIcon(icon, size: 22, color: foreground.withValues(alpha: 0.85))]),
+  );
 
   /// Une ligne à taille naturelle (`mainAxisSize: min`, jamais de
   /// [Flexible]), réduite si besoin par le [FittedBox] qui l'entoure — voir
   /// la note de classe sur pourquoi jamais l'inverse.
   static Widget _fit(List<Widget> row) => FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Row(mainAxisSize: MainAxisSize.min, children: row),
-      );
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: Row(mainAxisSize: MainAxisSize.min, children: row),
+  );
 }

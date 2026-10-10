@@ -298,6 +298,22 @@ class RideRecorder extends ChangeNotifier {
     _notify();
   }
 
+  /// Saute le bloc en cours **s'il est optionnel** : l'horloge du programme avance du temps
+  /// qu'il lui restait, si bien que le bloc suivant s'ouvre tout de suite et que tous les
+  /// jalons d'après arrivent d'autant plus tôt. `WorkoutPolicy` voit alors le jalon franchi
+  /// au tic suivant, comme s'il l'avait été naturellement (tour marqué, voix, sons).
+  /// Rend `false` quand il n'y a rien à sauter — aucun programme, ou bloc obligatoire.
+  bool skipWorkoutBlock() {
+    final program = _activeWorkout;
+    final elapsed = workoutElapsed;
+    if (program == null || elapsed == null) return false;
+    final skipped = program.skippableSecondsAt(elapsed);
+    if (skipped == null || skipped <= 0) return false;
+    _workoutStartSeconds = _workoutStartSeconds! - skipped;
+    _notify();
+    return true;
+  }
+
   /// Détache le programme actif, sans arrêter la sortie ni l'enregistrement.
   /// Les tours déjà ouverts dans [workoutLapSeries] restent lisibles (page
   /// Tours) : seul le déroulement automatique s'arrête.
