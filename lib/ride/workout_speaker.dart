@@ -41,37 +41,21 @@ class WorkoutSpeaker {
     }
   }
 
-  /// La voix nommée par le profil si elle existe ; sinon la meilleure voix
-  /// française : une voix « réseau » (plus expressive) avant une voix locale,
-  /// hors voix signalées comme non installées.
+  /// La voix nommée par le profil, si elle est installée. Sans nom (ou nom
+  /// introuvable) : `null`, le moteur garde sa voix par défaut — choisir
+  /// « la meilleure » à l'aveugle tombait sur une voix d'homme là où le
+  /// moteur en avait une de femme par défaut.
   Future<Map<String, String>?> _pickVoice() async {
+    final wanted = _settings.voiceName;
+    if (wanted == null) return null;
     final raw = await _tts.getVoices;
     if (raw is! List) return null;
-    final voices = <Map<String, String>>[
-      for (final v in raw)
-        if (v is Map && v['name'] != null && v['locale'] != null)
-          {'name': '${v['name']}', 'locale': '${v['locale']}'},
-    ];
-    final wanted = _settings.voiceName;
-    if (wanted != null) {
-      for (final v in voices) {
-        if (v['name'] == wanted) return v;
+    for (final v in raw) {
+      if (v is Map && v['name'] == wanted && v['locale'] != null) {
+        return {'name': '${v['name']}', 'locale': '${v['locale']}'};
       }
     }
-    final french = voices
-        .where((v) => v['locale']!.toLowerCase().replaceAll('_', '-').startsWith('fr'))
-        .toList();
-    if (french.isEmpty) return null;
-    french.sort((a, b) => _score(b).compareTo(_score(a)));
-    return french.first;
-  }
-
-  int _score(Map<String, String> v) {
-    final name = v['name']!.toLowerCase();
-    var score = 0;
-    if (name.contains('network')) score += 2;
-    if (v['locale']!.toLowerCase().replaceAll('_', '-') == 'fr-fr') score += 1;
-    return score;
+    return null;
   }
 
   Future<void> warmUp() async {
