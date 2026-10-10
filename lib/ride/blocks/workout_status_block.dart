@@ -87,14 +87,16 @@ class WorkoutStatusCard extends StatelessWidget {
         }
         final icon = workoutMilestoneIconFor(milestone?.icon);
 
+        // Tronçon en cours optionnel : un grand glissé le saute (`WorkoutSkipSwipe`), on le dit.
+        final skippable = !upcoming && milestone?.optional == true;
         final line = mode == WorkoutStatusMode.line;
         return BlockSurface(
           background: background,
           // Mode complet : le contenu remplit la case, le plus large et le plus haut possible.
           grow: !line,
           child: line
-              ? SizedBox(width: _lineWidth, child: _line(icon, segmentLabel, remainingLabel, ink, metrics))
-              : _full(icon, segmentLabel, remainingLabel, ink, metrics),
+              ? SizedBox(width: _lineWidth, child: _line(icon, segmentLabel, remainingLabel, ink, metrics, skippable: skippable))
+              : _full(icon, segmentLabel, remainingLabel, ink, metrics, skippable: skippable),
         );
       },
     ),
@@ -106,17 +108,30 @@ class WorkoutStatusCard extends StatelessWidget {
   /// Les deux lignes sont **centrées**, à leur largeur naturelle : le nom du tronçon n'est
   /// jamais coupé, c'est la mise à l'échelle de la carte (qui ici agrandit aussi, `grow`) qui
   /// le fait tenir — aussi large et aussi haut que la case le permet.
-  Widget _full(FaIconData icon, String segment, String remaining, Color ink, BlockMetrics metrics) => Column(
+  Widget _full(
+    FaIconData icon,
+    String segment,
+    String remaining,
+    Color ink,
+    BlockMetrics metrics, {
+    required bool skippable,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.center,
     mainAxisSize: MainAxisSize.min,
     children: [
       _centeredRow(icon, segment, ink, metrics),
       SizedBox(height: metrics.gap * 0.6),
-      _centeredRow(FontAwesomeIcons.stopwatch, remaining, ink, metrics),
+      _centeredRow(FontAwesomeIcons.stopwatch, remaining, ink, metrics, skippable: skippable),
     ],
   );
 
-  Widget _centeredRow(FaIconData icon, String label, Color ink, BlockMetrics metrics) => Row(
+  Widget _centeredRow(
+    FaIconData icon,
+    String label,
+    Color ink,
+    BlockMetrics metrics, {
+    bool skippable = false,
+  }) => Row(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
@@ -128,13 +143,27 @@ class WorkoutStatusCard extends StatelessWidget {
         softWrap: false,
         style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
       ),
+      if (skippable) ..._skipHint(ink, metrics),
     ],
   );
+
+  /// L'indication « glisser pour sauter », en bout de ligne : l'icône d'avance rapide.
+  List<Widget> _skipHint(Color ink, BlockMetrics metrics) => [
+    SizedBox(width: metrics.gap * 0.6),
+    FaIcon(FontAwesomeIcons.forward, size: _figureSize * 0.7, color: ink.withValues(alpha: 0.7)),
+  ];
 
   /// [WorkoutStatusMode.line] : icône, nom du tronçon et temps restant sur
   /// une seule ligne — le nom cède la place en premier (`Expanded` +
   /// ellipse), le temps ne tronque jamais.
-  Widget _line(FaIconData icon, String segment, String remaining, Color ink, BlockMetrics metrics) => Row(
+  Widget _line(
+    FaIconData icon,
+    String segment,
+    String remaining,
+    Color ink,
+    BlockMetrics metrics, {
+    required bool skippable,
+  }) => Row(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       FaIcon(icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
@@ -153,6 +182,7 @@ class WorkoutStatusCard extends StatelessWidget {
         maxLines: 1,
         style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
       ),
+      if (skippable) ..._skipHint(ink, metrics),
     ],
   );
 }
