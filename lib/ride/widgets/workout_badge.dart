@@ -62,7 +62,7 @@ class WorkoutBadge extends StatelessWidget {
       child: Opacity(
         opacity: upcoming ? 0.6 : 1,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(20),
@@ -84,7 +84,9 @@ class WorkoutBadge extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 110),
+                // La moitié de la largeur de l'écran plutôt qu'un plafond fixe : le nom d'un
+                // tronçon (« Intervalles 4 × 8 min ») se lit en entier quand la place existe.
+                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.5),
                 child: Text(
                   label,
                   maxLines: 1,
