@@ -20,6 +20,7 @@ class WorkoutBadge extends StatelessWidget {
     required this.milestone,
     this.remaining,
     this.upcoming = false,
+    this.onTap,
   });
 
   final WorkoutMilestone milestone;
@@ -34,6 +35,10 @@ class WorkoutBadge extends StatelessWidget {
   /// (rien n'a encore commencé) et une opacité réduite, pour ne jamais se
   /// lire comme un second tronçon déjà actif.
   final bool upcoming;
+
+  /// Un tap sur la pastille — `RideShellPage` y branche la relecture de la
+  /// description du tronçon. `null` : pastille inerte (l'aperçu du suivant).
+  final VoidCallback? onTap;
 
   /// Combien de temps avant la fin du tronçon en cours l'aperçu du suivant
   /// doit paraître.
@@ -52,41 +57,58 @@ class WorkoutBadge extends StatelessWidget {
     final name = milestone.segmentName;
     final label = name.isEmpty ? '—' : name;
 
-    return Opacity(
-      opacity: upcoming ? 0.6 : 1,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 4)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (upcoming) ...[
-              Icon(Icons.arrow_downward, size: 13, color: fg),
-              const SizedBox(width: 4),
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: upcoming ? 0.6 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(color: Color(0x66000000), blurRadius: 4),
             ],
-            FaIcon(workoutMilestoneIconFor(milestone.icon), size: 15, color: fg),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 110),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 15),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (upcoming) ...[
+                Icon(Icons.arrow_downward, size: 13, color: fg),
+                const SizedBox(width: 4),
+              ],
+              FaIcon(
+                workoutMilestoneIconFor(milestone.icon),
+                size: 15,
+                color: fg,
               ),
-            ),
-            if (!upcoming) ...[
-              const SizedBox(width: 8),
-              Text(
-                remaining == null ? _finished : formatDuration(remaining!),
-                style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 13),
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 110),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
               ),
+              if (!upcoming) ...[
+                const SizedBox(width: 8),
+                Text(
+                  remaining == null ? _finished : formatDuration(remaining!),
+                  style: TextStyle(
+                    color: fg,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

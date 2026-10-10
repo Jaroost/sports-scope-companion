@@ -40,13 +40,25 @@ import '../../dashboard/dashboard_block.dart';
 /// sonnette qu'on lance pour se faire entendre doit couvrir la musique, pas
 /// jouer par-dessus.
 class BellPlayer extends ChangeNotifier {
-  static final _alarmContext = AudioContext(
-    android: const AudioContextAndroid(
-      contentType: AndroidContentType.sonification,
-      usageType: AndroidUsageType.alarm,
-      audioFocus: AndroidAudioFocus.gainTransient,
-    ),
-  );
+  /// [duck] : baisse la musique au lieu de l'interrompre
+  /// (`gainTransientMayDuck`). Pour un signal qui n'a pas à couvrir quoi que
+  /// ce soit — la fin d'un minuteur, pas un téléphone qu'on cherche — et
+  /// surtout parce que certaines applis de musique (Deezer, constaté) ne
+  /// reprennent **pas** d'elles-mêmes après une interruption transitoire,
+  /// contrairement à ce que dit le paragraphe ci-dessus : la musique
+  /// restait coupée jusqu'à ce qu'on la relance à la main.
+  BellPlayer({bool duck = false})
+    : _alarmContext = AudioContext(
+        android: AudioContextAndroid(
+          contentType: AndroidContentType.sonification,
+          usageType: AndroidUsageType.alarm,
+          audioFocus: duck
+              ? AndroidAudioFocus.gainTransientMayDuck
+              : AndroidAudioFocus.gainTransient,
+        ),
+      );
+
+  final AudioContext _alarmContext;
 
   static const _failsafe = Duration(seconds: 7);
 
@@ -65,7 +77,11 @@ class BellPlayer extends ChangeNotifier {
 
     try {
       final player = AudioPlayer()..setReleaseMode(ReleaseMode.release);
-      player.onPlayerComplete.first.then((_) => stop());
+      // `catchError` : un lecteur libéré avant la fin (minuteur de secours)
+      // ferme le flux sans événement, et `first` lève alors « No element ».
+      player.onPlayerComplete.first
+          .then((_) => stop())
+          .catchError((Object _) {});
       // `ctx` directement sur `play()` plutôt que `AudioPlayer.global.
       // setAudioContext` : ce dernier changerait le flux par défaut de
       // *tous* les lecteurs de l'appli (radar, virages), pas seulement de

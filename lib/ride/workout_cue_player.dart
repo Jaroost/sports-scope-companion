@@ -38,6 +38,11 @@ class WorkoutCuePlayer {
       await AudioPlayer.global.setAudioContext(_context);
       for (final sound in WorkoutSound.values) {
         final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+        // Le contexte posé sur **ce** lecteur, en plus du global : le global
+        // est partagé avec le radar, les cols et la batterie, et ne vaut que
+        // pour les lecteurs créés après lui. Ce son est celui qui doit
+        // baisser la musique, pas dépendre de qui a chargé le dernier.
+        await player.setAudioContext(_context);
         await player.setSource(AssetSource(sound.asset));
         _players[sound] = player;
         final duration = await player.getDuration();

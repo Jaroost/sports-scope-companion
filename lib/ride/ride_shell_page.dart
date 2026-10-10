@@ -2407,7 +2407,16 @@ class _RideShellPageState extends State<RideShellPage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          WorkoutBadge(milestone: milestone, remaining: remaining),
+                          WorkoutBadge(
+                            milestone: milestone,
+                            remaining: remaining,
+                            // Relit la consigne du tronçon en cours, même si
+                            // le profil coupe les sons : c'est un geste
+                            // explicite, pas une annonce automatique.
+                            onTap: milestone.description.isEmpty
+                                ? null
+                                : () => _workoutSpeaker.speak(milestone.description),
+                          ),
                           if (next != null) ...[
                             const SizedBox(height: 6),
                             WorkoutBadge(milestone: next, upcoming: true),

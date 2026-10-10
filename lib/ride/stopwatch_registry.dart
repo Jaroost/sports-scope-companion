@@ -55,7 +55,7 @@ class StopwatchController extends ChangeNotifier {
 /// acquitté, et l'appui sur le bouton principal remet à zéro.
 class TimerController extends ChangeNotifier {
   final Stopwatch _watch = Stopwatch();
-  final BellPlayer _bell = BellPlayer();
+  final BellPlayer _bell = BellPlayer(duck: true);
   Timer? _due;
   bool _finished = false;
   int _durationS = 60;
