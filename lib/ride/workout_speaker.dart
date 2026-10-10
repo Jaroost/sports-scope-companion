@@ -44,6 +44,17 @@ class WorkoutSpeaker {
     }
   }
 
+  /// Coupe la phrase en cours (sans effet s'il n'y en a pas). Appelée quand
+  /// un son démarre — dont un son de fin « avant », parti en avance sur la
+  /// frontière — et quand un tronçon s'ouvre sans description : la voix ne
+  /// déborde ni sur un bip ni sur le tronçon suivant.
+  Future<void> stop() async {
+    if (!_ready) return;
+    try {
+      await _tts.stop();
+    } catch (_) {}
+  }
+
   Future<void> dispose() async {
     try {
       await _tts.stop();

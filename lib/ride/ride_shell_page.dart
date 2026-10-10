@@ -1053,12 +1053,22 @@ class _RideShellPageState extends State<RideShellPage>
     // Lu avant le franchissement lui-même : c'est ce qui fait démarrer le
     // son en avance sur l'offset qu'il annonce.
     final cue = _workoutCuePolicy?.read(elapsed);
-    if (_preset.workout.sounds && cue != null) _workoutCue.play(cue.sound);
+    if (_preset.workout.sounds && cue != null) {
+      // Le son passe avant la voix : un son de fin « avant » démarre en avance
+      // sur la frontière, et c'est lui qui borne la phrase en cours.
+      unawaited(_workoutSpeaker.stop());
+      _workoutCue.play(cue.sound);
+    }
 
     final milestone = _workoutPolicy?.read(elapsed);
     if (milestone != null && _preset.workout.sounds && milestone.description.isNotEmpty) {
       _pendingWorkoutSpeech = milestone.description;
       _pendingSpeechBoundary = milestone.offsetSeconds;
+    }
+    // Un tronçon qui s'ouvre sans description coupe quand même la phrase du
+    // précédent : elle décrirait sinon le mauvais bloc.
+    if (milestone != null && _pendingWorkoutSpeech == null) {
+      unawaited(_workoutSpeaker.stop());
     }
     _flushWorkoutSpeech();
     if (milestone == null) return;
