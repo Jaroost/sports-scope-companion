@@ -49,7 +49,6 @@ class WorkoutStatusCard extends StatelessWidget {
   final Color? color;
   final Color? textColor;
 
-  static const _naturalWidth = 220.0;
   static const _lineWidth = 260.0;
   static const _figureSize = 24.0;
   static const _finished = 'Terminé';
@@ -88,14 +87,14 @@ class WorkoutStatusCard extends StatelessWidget {
         }
         final icon = workoutMilestoneIconFor(milestone?.icon);
 
+        final line = mode == WorkoutStatusMode.line;
         return BlockSurface(
           background: background,
-          child: SizedBox(
-            width: mode == WorkoutStatusMode.line ? _lineWidth : _naturalWidth,
-            child: mode == WorkoutStatusMode.line
-                ? _line(icon, segmentLabel, remainingLabel, ink, metrics)
-                : _full(icon, segmentLabel, remainingLabel, ink, metrics),
-          ),
+          // Mode complet : le contenu remplit la case, le plus large et le plus haut possible.
+          grow: !line,
+          child: line
+              ? SizedBox(width: _lineWidth, child: _line(icon, segmentLabel, remainingLabel, ink, metrics))
+              : _full(icon, segmentLabel, remainingLabel, ink, metrics),
         );
       },
     ),
@@ -103,13 +102,32 @@ class WorkoutStatusCard extends StatelessWidget {
 
   /// [WorkoutStatusMode.full] : le tronçon, puis le temps restant, chacun sa
   /// ligne — mêmes rangées que [WorkoutSegmentCard]/[WorkoutRemainingCard].
+  ///
+  /// Les deux lignes sont **centrées**, à leur largeur naturelle : le nom du tronçon n'est
+  /// jamais coupé, c'est la mise à l'échelle de la carte (qui ici agrandit aussi, `grow`) qui
+  /// le fait tenir — aussi large et aussi haut que la case le permet.
   Widget _full(FaIconData icon, String segment, String remaining, Color ink, BlockMetrics metrics) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+    crossAxisAlignment: CrossAxisAlignment.center,
     mainAxisSize: MainAxisSize.min,
     children: [
-      _row(icon, segment, ink, metrics),
+      _centeredRow(icon, segment, ink, metrics),
       SizedBox(height: metrics.gap * 0.6),
-      _row(FontAwesomeIcons.stopwatch, remaining, ink, metrics),
+      _centeredRow(FontAwesomeIcons.stopwatch, remaining, ink, metrics),
+    ],
+  );
+
+  Widget _centeredRow(FaIconData icon, String label, Color ink, BlockMetrics metrics) => Row(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      FaIcon(icon, size: _figureSize * 0.8, color: ink.withValues(alpha: 0.85)),
+      SizedBox(width: metrics.gap * 0.6),
+      Text(
+        label,
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
+      ),
     ],
   );
 
@@ -134,22 +152,6 @@ class WorkoutStatusCard extends StatelessWidget {
         remaining,
         maxLines: 1,
         style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
-      ),
-    ],
-  );
-
-  Widget _row(FaIconData icon, String label, Color ink, BlockMetrics metrics) => Row(
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      FaIcon(icon, size: metrics.iconSize, color: ink.withValues(alpha: 0.85)),
-      SizedBox(width: metrics.gap * 0.6),
-      Expanded(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: ink, fontSize: _figureSize, fontWeight: FontWeight.w500),
-        ),
       ),
     ],
   );

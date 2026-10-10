@@ -296,9 +296,15 @@ class BlockSurface extends StatelessWidget {
     required this.child,
     this.background,
     this.backgroundChart,
+    this.grow = false,
   });
 
   final Widget child;
+
+  /// Le contenu s'agrandit aussi pour remplir la case (le plus large et le plus haut
+  /// possible, proportions gardées), au lieu de seulement se réduire — voir [ScaleToFit].
+  /// Réservé aux composants dont le contenu **est** la case (l'état d'entraînement).
+  final bool grow;
 
   /// L'aplat de zone, quand la mesure en porte un. Le fond des cartes sinon.
   final Color? background;
@@ -328,7 +334,7 @@ class BlockSurface extends StatelessWidget {
           builder: (context, constraints) {
             final content = Padding(
               padding: EdgeInsets.all(BlockMetrics.natural.padding),
-              child: ScaleToFit(child: child),
+              child: ScaleToFit(grow: grow, child: child),
             );
             final chart = backgroundChart;
             // `Stack(fit: expand)` réclame des contraintes bornées, comme
@@ -366,9 +372,13 @@ class BlockSurface extends StatelessWidget {
 /// qui défile, la carte prend la place qu'il lui faut, et un enfant mis à
 /// l'échelle dans un `SizedBox.expand` sous une contrainte infinie lèverait.
 class ScaleToFit extends StatelessWidget {
-  const ScaleToFit({super.key, required this.child});
+  const ScaleToFit({super.key, required this.child, this.grow = false});
 
   final Widget child;
+
+  /// `BoxFit.contain` plutôt que `scaleDown` : le contenu remplit la case, quitte à être
+  /// agrandi au-delà de sa taille naturelle.
+  final bool grow;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -377,7 +387,7 @@ class ScaleToFit extends StatelessWidget {
             return child;
           }
           return SizedBox.expand(
-            child: FittedBox(fit: BoxFit.scaleDown, child: child),
+            child: FittedBox(fit: grow ? BoxFit.contain : BoxFit.scaleDown, child: child),
           );
         },
       );
