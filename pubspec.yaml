@@ -70,6 +70,7 @@ dependencies:
   # geste d'un doigt entrerait en conflit avec le glissé qui change de page.
   flutter_map: ^8.3.1
   latlong2: ^0.10.1
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:

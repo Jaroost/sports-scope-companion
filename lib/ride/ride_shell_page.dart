@@ -58,6 +58,7 @@ import 'stopwatch_registry.dart';
 import 'screen_policy.dart';
 import 'turn_proximity.dart';
 import 'workout_cue_player.dart';
+import 'workout_speaker.dart';
 import 'workout_policy.dart';
 import 'widgets/battery_alert_page.dart';
 import 'widgets/climb_badge.dart';
@@ -673,6 +674,7 @@ class _RideShellPageState extends State<RideShellPage>
   /// musique à chaque fois qu'un col ou un rappel, tous deux rares par
   /// comparaison.
   final _workoutCue = WorkoutCuePlayer();
+  final _workoutSpeaker = WorkoutSpeaker();
 
   /// Le jalon dont le popup de changement est à l'écran, `null` = rien à
   /// montrer — même patron que [_batteryAlert]/[_reminderAlert], mais un
@@ -777,6 +779,7 @@ class _RideShellPageState extends State<RideShellPage>
     // tout moment de la sortie (menu ⋮), pas seulement au départ.
     if (_preset.workout.sounds) {
       unawaited(_workoutCue.warmUp());
+      unawaited(_workoutSpeaker.warmUp());
     }
     // Un col n'existe que sur une carte (voir `NavState.climb`) : sans elle,
     // le front ne se produira jamais et il n'y a rien à charger d'avance.
@@ -1047,6 +1050,7 @@ class _RideShellPageState extends State<RideShellPage>
     final milestone = _workoutPolicy?.read(elapsed);
     if (milestone == null) return;
     widget.recorder.markLap(workoutLapSeries, label: milestone.segmentName);
+    if (_preset.workout.sounds) _workoutSpeaker.speak(milestone.description);
     if (_preset.workout.popup) _showWorkoutChangePopup(milestone);
   }
 
@@ -2065,6 +2069,7 @@ class _RideShellPageState extends State<RideShellPage>
     _radarSound.dispose();
     _climbSound.dispose();
     unawaited(_workoutCue.dispose());
+    unawaited(_workoutSpeaker.dispose());
     _workoutChangeTimer?.cancel();
     _workoutChangeAlert.dispose();
     _battery.removeListener(_onBatteryStatus);

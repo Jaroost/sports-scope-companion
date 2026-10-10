@@ -118,6 +118,7 @@ class WorkoutMilestone {
   const WorkoutMilestone({
     required this.offsetSeconds,
     required this.segmentName,
+    required this.description,
     required this.icon,
     required this.color,
     required this.textColor,
@@ -137,6 +138,10 @@ class WorkoutMilestone {
 
   final int offsetSeconds;
   final String segmentName;
+
+  /// Le texte que l'appli lit à voix haute à l'ouverture du tronçon
+  /// (`WorkoutSpeaker`) ; vide quand le bloc n'en porte pas — rien à dire.
+  final String description;
 
   /// L'icône du tronçon qu'ouvre ce jalon — voir `workoutMilestoneIconFor`
   /// (`companion_icons.dart`) pour le dessin réel.
@@ -174,6 +179,7 @@ class WorkoutMilestone {
     return WorkoutMilestone(
       offsetSeconds: offsetSeconds,
       segmentName: raw['segment_name'] is String ? raw['segment_name'] as String : '',
+      description: raw['description'] is String ? (raw['description'] as String).trim() : '',
       icon: WorkoutMilestoneIcon.parse(raw['icon']),
       color: _colorOf(raw['color']),
       textColor: _colorOf(raw['text_color']),
@@ -197,6 +203,7 @@ class WorkoutMilestone {
   static WorkoutMilestone closing(int offsetSeconds) => WorkoutMilestone(
         offsetSeconds: offsetSeconds,
         segmentName: '',
+        description: '',
         icon: null,
         color: null,
         textColor: null,
