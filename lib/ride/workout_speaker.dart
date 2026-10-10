@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+
+import '../dashboard/ride_preset.dart';
 
 /// Lit à voix haute la description d'un bloc d'entraînement à son début.
 ///
@@ -13,12 +17,69 @@ import 'package:flutter_tts/flutter_tts.dart';
 class WorkoutSpeaker {
   final _tts = FlutterTts();
   bool _ready = false;
+  WorkoutSettings _settings = const WorkoutSettings();
+
+  /// Applique le ton et la voix du profil. Appelée à chaque changement de
+  /// profil : la prochaine phrase en tient compte, sans relancer le moteur.
+  void configure(WorkoutSettings settings) {
+    final changed = settings.voiceStyle != _settings.voiceStyle ||
+        settings.voiceName != _settings.voiceName;
+    _settings = settings;
+    if (changed && _ready) unawaited(_applyVoice());
+  }
+
+  /// Hauteur, débit et voix. Un échec ne bloque jamais la lecture : le moteur
+  /// garde alors ses valeurs par défaut.
+  Future<void> _applyVoice() async {
+    try {
+      await _tts.setPitch(_settings.voiceStyle.pitch);
+      await _tts.setSpeechRate(_settings.voiceStyle.rate);
+      final voice = await _pickVoice();
+      if (voice != null) await _tts.setVoice(voice);
+    } catch (e) {
+      debugPrint('[entraînement] réglage de la voix impossible : $e');
+    }
+  }
+
+  /// La voix nommée par le profil si elle existe ; sinon la meilleure voix
+  /// française : une voix « réseau » (plus expressive) avant une voix locale,
+  /// hors voix signalées comme non installées.
+  Future<Map<String, String>?> _pickVoice() async {
+    final raw = await _tts.getVoices;
+    if (raw is! List) return null;
+    final voices = <Map<String, String>>[
+      for (final v in raw)
+        if (v is Map && v['name'] != null && v['locale'] != null)
+          {'name': '${v['name']}', 'locale': '${v['locale']}'},
+    ];
+    final wanted = _settings.voiceName;
+    if (wanted != null) {
+      for (final v in voices) {
+        if (v['name'] == wanted) return v;
+      }
+    }
+    final french = voices
+        .where((v) => v['locale']!.toLowerCase().replaceAll('_', '-').startsWith('fr'))
+        .toList();
+    if (french.isEmpty) return null;
+    french.sort((a, b) => _score(b).compareTo(_score(a)));
+    return french.first;
+  }
+
+  int _score(Map<String, String> v) {
+    final name = v['name']!.toLowerCase();
+    var score = 0;
+    if (name.contains('network')) score += 2;
+    if (v['locale']!.toLowerCase().replaceAll('_', '-') == 'fr-fr') score += 1;
+    return score;
+  }
 
   Future<void> warmUp() async {
     try {
       await _tts.setLanguage('fr-FR');
       await _tts.setAudioAttributesForNavigation();
       _ready = true;
+      await _applyVoice();
     } catch (e) {
       debugPrint('[entraînement] synthèse vocale indisponible : $e');
     }

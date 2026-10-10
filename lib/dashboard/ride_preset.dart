@@ -1567,22 +1567,56 @@ class ClimbSettings {
 /// tonalités de jalon (`WorkoutCuePlayer`).
 ///
 /// « Absent vaut activé » pour les trois, même logique que [ClimbSettings.sounds].
+/// Le ton de la voix qui lit les descriptions de tronçon : hauteur et débit
+/// passés au moteur de synthèse (`WorkoutSpeaker`). `lively` est le défaut.
+enum WorkoutVoiceStyle {
+  calm(pitch: 1.0, rate: 0.5),
+  lively(pitch: 1.15, rate: 0.55),
+  energetic(pitch: 1.3, rate: 0.6);
+
+  const WorkoutVoiceStyle({required this.pitch, required this.rate});
+
+  final double pitch;
+  final double rate;
+
+  static WorkoutVoiceStyle parse(Object? raw) {
+    for (final v in values) {
+      if (v.name == raw) return v;
+    }
+    return WorkoutVoiceStyle.lively;
+  }
+}
+
 @immutable
 class WorkoutSettings {
-  const WorkoutSettings({this.badge = true, this.popup = true, this.sounds = true});
+  const WorkoutSettings({
+    this.badge = true,
+    this.popup = true,
+    this.sounds = true,
+    this.voiceStyle = WorkoutVoiceStyle.lively,
+    this.voiceName,
+  });
 
   final bool badge;
   final bool popup;
   final bool sounds;
+  final WorkoutVoiceStyle voiceStyle;
+
+  /// Nom d'une voix installée sur le téléphone ; `null` = choisir
+  /// automatiquement la meilleure voix française.
+  final String? voiceName;
 
   static WorkoutSettings parse(Object? raw) {
     if (raw is! Map) return const WorkoutSettings();
     const fallback = WorkoutSettings();
+    final name = raw['voice_name'];
 
     return WorkoutSettings(
       badge: raw['badge'] is bool ? raw['badge'] as bool : fallback.badge,
       popup: raw['popup'] is bool ? raw['popup'] as bool : fallback.popup,
       sounds: raw['sounds'] is bool ? raw['sounds'] as bool : fallback.sounds,
+      voiceStyle: WorkoutVoiceStyle.parse(raw['voice_style']),
+      voiceName: name is String && name.trim().isNotEmpty ? name.trim() : null,
     );
   }
 }

@@ -1076,6 +1076,13 @@ class _RideShellPageState extends State<RideShellPage>
     if (_preset.workout.popup) _showWorkoutChangePopup(milestone);
   }
 
+  /// Lit [text] avec le ton et la voix du profil courant — relus à chaque
+  /// phrase plutôt qu'à l'ouverture, le profil pouvant changer en cours de sortie.
+  Future<void> _speakWorkout(String text) {
+    _workoutSpeaker.configure(_preset.workout);
+    return _workoutSpeaker.speak(text);
+  }
+
   /// Dit la description en attente si plus aucun son ne sonne ni ne reste à
   /// jouer sur sa frontière. Rappelée à chaque tic : un son de fin `at` et un
   /// son de début `at` se suivent à un tic d'écart (un seul son par tic,
@@ -1086,7 +1093,7 @@ class _RideShellPageState extends State<RideShellPage>
     if (_workoutCue.busy) return;
     if (_workoutCuePolicy?.hasUnplayedAt(_pendingSpeechBoundary) ?? false) return;
     _pendingWorkoutSpeech = null;
-    unawaited(_workoutSpeaker.speak(text));
+    unawaited(_speakWorkout(text));
   }
 
   /// Affiche le popup de changement de tronçon, et programme son effacement.
@@ -2450,7 +2457,7 @@ class _RideShellPageState extends State<RideShellPage>
                             // explicite, pas une annonce automatique.
                             onTap: milestone.description.isEmpty
                                 ? null
-                                : () => _workoutSpeaker.speak(milestone.description),
+                                : () => _speakWorkout(milestone.description),
                           ),
                           if (next != null) ...[
                             const SizedBox(height: 6),
