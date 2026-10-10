@@ -380,6 +380,7 @@ sealed class RidePageSpec {
     this.icon,
     this.key,
     this.leaveButton = false,
+    this.hideWorkoutBadge = false,
   });
 
   final String title;
@@ -435,6 +436,12 @@ sealed class RidePageSpec {
   /// booléen n'en ajoute qu'un raccourci de plus.
   final bool leaveButton;
 
+  /// Cache la pastille d'entraînement (`WorkoutBadge`, épinglée en haut) tant que
+  /// cette page est celle qu'on regarde — pour les pages qui n'ont pas la place
+  /// de la porter, ou qui disent déjà tout (le tronçon en cours posé en grand).
+  /// **Faux par défaut** : absent, la pastille reste visible comme avant.
+  final bool hideWorkoutBadge;
+
   static RidePageSpec? parse(Object? raw) {
     if (raw is! Map) return null;
     final title = raw['title'] is String ? raw['title'] as String : null;
@@ -450,13 +457,14 @@ sealed class RidePageSpec {
         ? raw['key'] as String
         : null;
     final leaveButton = raw['leave_button'] == true;
+    final hideWorkoutBadge = raw['hide_workout_badge'] == true;
 
     return switch (raw['kind']) {
       // Jamais derrière le menu, et pas par oubli : la carte est le WebView
       // peint au fond de la pile pour toute la sortie, pas une page qu'on ouvre
       // et qu'on referme. Elle ne paraît donc jamais dans le menu ⋮ et n'a pas
       // besoin de son icône.
-      'map' => MapPageSpec(key: key),
+      'map' => MapPageSpec(key: key, hideWorkoutBadge: hideWorkoutBadge),
       'grid' => GridPageSpec.parse(
           raw,
           title: title,
@@ -467,6 +475,7 @@ sealed class RidePageSpec {
           icon: icon,
           key: key,
           leaveButton: leaveButton,
+          hideWorkoutBadge: hideWorkoutBadge,
         ),
       'list' => ListPageSpec.parse(
           raw,
@@ -478,6 +487,7 @@ sealed class RidePageSpec {
           icon: icon,
           key: key,
           leaveButton: leaveButton,
+          hideWorkoutBadge: hideWorkoutBadge,
         ),
       'laps' => LapListPageSpec.parse(
           raw,
@@ -489,6 +499,7 @@ sealed class RidePageSpec {
           icon: icon,
           key: key,
           leaveButton: leaveButton,
+          hideWorkoutBadge: hideWorkoutBadge,
         ),
       _ => null,
     };
@@ -539,7 +550,7 @@ enum PageMenuCondition {
 /// plateforme démontée cesse de suivre le cycliste), et sa position dans le
 /// catalogue n'y change rien.
 class MapPageSpec extends RidePageSpec {
-  const MapPageSpec({super.key}) : super(title: 'Carte');
+  const MapPageSpec({super.key, super.hideWorkoutBadge}) : super(title: 'Carte');
 }
 
 /// Une grille de `rows` × `cols`, avec fusions.
@@ -560,6 +571,7 @@ class GridPageSpec extends RidePageSpec {
     super.icon,
     super.key,
     super.leaveButton,
+    super.hideWorkoutBadge,
   });
 
   final int rows;
@@ -587,6 +599,7 @@ class GridPageSpec extends RidePageSpec {
     FaIconData? icon,
     String? key,
     bool leaveButton = false,
+    bool hideWorkoutBadge = false,
   }) {
     final rows = _gridSide(raw['rows']);
     final cols = _gridSide(raw['cols']);
@@ -610,6 +623,7 @@ class GridPageSpec extends RidePageSpec {
       icon: icon,
       key: key,
       leaveButton: leaveButton,
+      hideWorkoutBadge: hideWorkoutBadge,
     );
   }
 }
@@ -695,6 +709,7 @@ class ListPageSpec extends RidePageSpec {
     super.icon,
     super.key,
     super.leaveButton,
+    super.hideWorkoutBadge,
   });
 
   final List<ListBlockPlacement> blocks;
@@ -718,6 +733,7 @@ class ListPageSpec extends RidePageSpec {
     FaIconData? icon,
     String? key,
     bool leaveButton = false,
+    bool hideWorkoutBadge = false,
   }) {
     final cols = raw['cols'] is num
         ? (raw['cols'] as num).toInt().clamp(1, maxCols)
@@ -738,6 +754,7 @@ class ListPageSpec extends RidePageSpec {
       icon: icon,
       key: key,
       leaveButton: leaveButton,
+      hideWorkoutBadge: hideWorkoutBadge,
     );
   }
 }
@@ -807,6 +824,7 @@ class LapListPageSpec extends RidePageSpec {
     super.icon,
     super.key,
     super.leaveButton,
+    super.hideWorkoutBadge,
   });
 
   final String series;
@@ -826,6 +844,7 @@ class LapListPageSpec extends RidePageSpec {
     FaIconData? icon,
     String? key,
     bool leaveButton = false,
+    bool hideWorkoutBadge = false,
   }) {
     final layout = LapPageLayout.parse(raw);
     // Une page de tours sans le moindre composant n'a rien à montrer une fois
@@ -842,6 +861,7 @@ class LapListPageSpec extends RidePageSpec {
       icon: icon,
       key: key,
       leaveButton: leaveButton,
+      hideWorkoutBadge: hideWorkoutBadge,
     );
   }
 }

@@ -2158,6 +2158,11 @@ class _RideShellPageState extends State<RideShellPage>
     // dépositionnerait entièrement.
     final menuPageIndex = _menuPage;
     final openedMenuPage = menuPageIndex == null ? null : _menuPages[menuPageIndex];
+    // La page sous les yeux : celle ouverte depuis le menu, sinon celle du défilement.
+    // Elle peut demander à cacher la pastille d'entraînement (`Page.hide_workout_badge`).
+    final ridePages = _ridePages;
+    final visiblePage = openedMenuPage ?? (ridePages.isEmpty ? null : ridePages[_page]);
+    final hideWorkoutBadge = visiblePage?.hideWorkoutBadge ?? false;
 
     return PopScope(
       canPop: false,
@@ -2421,7 +2426,7 @@ class _RideShellPageState extends State<RideShellPage>
             // curseur propre — même patron que `WorkoutSegmentCard` : c'est
             // une pastille, pas une politique de franchissement, elle n'a
             // rien à se souvenir entre deux rebuilds.
-            if (_preset.workout.badge)
+            if (_preset.workout.badge && !hideWorkoutBadge)
               Positioned(
                 key: const ValueKey('entrainement-pastille'),
                 top: 8,
