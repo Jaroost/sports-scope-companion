@@ -79,6 +79,7 @@ import 'widgets/ride_button_flash.dart';
 import 'widgets/ride_col_guess_flash.dart';
 import 'widgets/ride_page_flash.dart';
 import 'widgets/workout_badge.dart';
+import 'widgets/workout_skip_swipe.dart';
 import 'widgets/workout_change_popup.dart';
 
 /// La coquille d'une sortie : ce qui appartient à l'écran, pas à la page web.
@@ -2449,15 +2450,20 @@ class _RideShellPageState extends State<RideShellPage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          WorkoutBadge(
-                            milestone: milestone,
-                            remaining: remaining,
-                            // Relit la consigne du tronçon en cours, même si
-                            // le profil coupe les sons : c'est un geste
-                            // explicite, pas une annonce automatique.
-                            onTap: milestone.description.isEmpty
-                                ? null
-                                : () => _speakWorkout(milestone.description),
+                          // Un grand glissé sur la pastille saute le tronçon
+                          // s'il est optionnel (`WorkoutSkipSwipe`).
+                          WorkoutSkipSwipe(
+                            recorder: widget.recorder,
+                            child: WorkoutBadge(
+                              milestone: milestone,
+                              remaining: remaining,
+                              // Relit la consigne du tronçon en cours, même si
+                              // le profil coupe les sons : c'est un geste
+                              // explicite, pas une annonce automatique.
+                              onTap: milestone.description.isEmpty
+                                  ? null
+                                  : () => _speakWorkout(milestone.description),
+                            ),
                           ),
                           if (next != null) ...[
                             const SizedBox(height: 6),

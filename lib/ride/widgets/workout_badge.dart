@@ -106,6 +106,11 @@ class WorkoutBadge extends StatelessWidget {
                     fontSize: 13,
                   ),
                 ),
+                // Bloc optionnel : un grand glissé sur la pastille le saute.
+                if (milestone.optional) ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.fast_forward, size: 15, color: fg),
+                ],
               ],
             ],
           ),
