@@ -53,9 +53,24 @@ class WorkoutCuePlayer {
     }
   }
 
+  /// Jusqu'à quand un son lancé par [play] est censé sonner. Posé à
+  /// l'appel même : `seek` + `resume` sont asynchrones, l'état du lecteur
+  /// ne dit « en lecture » qu'un instant plus tard, et la voix ne doit pas
+  /// s'y glisser entre-temps.
+  DateTime? _busyUntil;
+
+  /// Un son est-il en cours (ou sur le point de l'être) ? C'est ce que la voix
+  /// attend pour ne pas se superposer à un bip (`WorkoutSpeaker`).
+  bool get busy {
+    final until = _busyUntil;
+    if (until != null && DateTime.now().isBefore(until)) return true;
+    return _players.values.any((p) => p.state == PlayerState.playing);
+  }
+
   void play(WorkoutSound sound) {
     final player = _players[sound];
     if (player == null) return;
+    _busyUntil = DateTime.now().add(durationOf(sound) + const Duration(milliseconds: 300));
     player.seek(Duration.zero).then((_) => player.resume()).catchError((
       Object e,
     ) {

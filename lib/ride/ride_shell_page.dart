@@ -676,6 +676,13 @@ class _RideShellPageState extends State<RideShellPage>
   final _workoutCue = WorkoutCuePlayer();
   final _workoutSpeaker = WorkoutSpeaker();
 
+  /// La description du tronçon qui vient de s'ouvrir, en attente de son tour :
+  /// elle ne se dit qu'après les sons de la frontière (fin du bloc d'avant,
+  /// début de celui-ci), jamais par-dessus. [_pendingSpeechBoundary] est
+  /// l'offset du jalon, qui permet de savoir s'il reste un son à jouer dessus.
+  String? _pendingWorkoutSpeech;
+  int _pendingSpeechBoundary = 0;
+
   /// Le jalon dont le popup de changement est à l'écran, `null` = rien à
   /// montrer — même patron que [_batteryAlert]/[_reminderAlert], mais un
   /// minuteur propre plutôt que la veille d'écran : ce popup s'efface après
@@ -1027,6 +1034,7 @@ class _RideShellPageState extends State<RideShellPage>
     final program = widget.recorder.activeWorkout;
     if (program != _workoutProgram) {
       _workoutProgram = program;
+      _pendingWorkoutSpeech = null;
       _workoutPolicy = program == null
           ? null
           : WorkoutPolicy(milestones: program.milestones, elapsed: Duration.zero);
@@ -1048,10 +1056,27 @@ class _RideShellPageState extends State<RideShellPage>
     if (_preset.workout.sounds && cue != null) _workoutCue.play(cue.sound);
 
     final milestone = _workoutPolicy?.read(elapsed);
+    if (milestone != null && _preset.workout.sounds && milestone.description.isNotEmpty) {
+      _pendingWorkoutSpeech = milestone.description;
+      _pendingSpeechBoundary = milestone.offsetSeconds;
+    }
+    _flushWorkoutSpeech();
     if (milestone == null) return;
     widget.recorder.markLap(workoutLapSeries, label: milestone.segmentName);
-    if (_preset.workout.sounds) _workoutSpeaker.speak(milestone.description);
     if (_preset.workout.popup) _showWorkoutChangePopup(milestone);
+  }
+
+  /// Dit la description en attente si plus aucun son ne sonne ni ne reste à
+  /// jouer sur sa frontière. Rappelée à chaque tic : un son de fin `at` et un
+  /// son de début `at` se suivent à un tic d'écart (un seul son par tic,
+  /// `WorkoutCuePolicy.read`), la voix passe après le dernier.
+  void _flushWorkoutSpeech() {
+    final text = _pendingWorkoutSpeech;
+    if (text == null) return;
+    if (_workoutCue.busy) return;
+    if (_workoutCuePolicy?.hasUnplayedAt(_pendingSpeechBoundary) ?? false) return;
+    _pendingWorkoutSpeech = null;
+    unawaited(_workoutSpeaker.speak(text));
   }
 
   /// Affiche le popup de changement de tronçon, et programme son effacement.

@@ -118,6 +118,16 @@ class WorkoutCuePolicy {
     return cues[best];
   }
 
+  /// Reste-t-il un son à lancer sur la frontière [boundarySeconds] — la fin
+  /// du bloc qui se termine, le début de celui qui s'ouvre ? Sert à la voix :
+  /// elle ne parle qu'une fois ces sons passés, pas entre deux d'entre eux.
+  bool hasUnplayedAt(int boundarySeconds) {
+    for (var i = 0; i < cues.length; i++) {
+      if (!_played[i] && cues[i].boundarySeconds == boundarySeconds) return true;
+    }
+    return false;
+  }
+
   /// Tous les sons ont-ils été lancés ?
   bool get finished => !_played.contains(false);
 }
