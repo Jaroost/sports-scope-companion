@@ -1,5 +1,27 @@
 import 'package:flutter/foundation.dart';
 
+/// Un morceau de l'aperçu d'un itinéraire : un tracé de pente homogène, en coordonnées
+/// d'une boîte de 100 × 100 (`routes.preview_segments` côté site, le même dessin que la
+/// liste des itinéraires). [category] : 0 plat, 1 montée, 2 descente. [path] reste la
+/// chaîne SVG du site (`M1.0,2.0 L3.0,4.0 …`) : le cache la garde telle quelle, et c'est
+/// `RoutePreview` qui la lit au dessin.
+@immutable
+class RoutePreviewSegment {
+  const RoutePreviewSegment(this.category, this.path);
+
+  final int category;
+  final String path;
+
+  static List<RoutePreviewSegment> listFrom(Object? raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final entry in raw)
+        if (entry is Map && entry['c'] is num && entry['d'] is String)
+          RoutePreviewSegment((entry['c'] as num).toInt(), entry['d'] as String),
+    ];
+  }
+}
+
 /// Un itinéraire du site, réduit à ce qu'il faut pour le choisir et le
 /// naviguer.
 ///
@@ -19,6 +41,7 @@ class RouteSummary {
     this.elevationGainM = 0,
     this.activity,
     this.updatedAt,
+    this.previewSegments = const [],
   });
 
   final int id;
@@ -34,6 +57,10 @@ class RouteSummary {
 
   final DateTime? updatedAt;
 
+  /// L'aperçu du tracé, vide quand le site n'en a pas (tracé trop court) ou qu'il est plus
+  /// ancien que l'appli — la ligne montre alors son pictogramme comme avant.
+  final List<RoutePreviewSegment> previewSegments;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -42,6 +69,9 @@ class RouteSummary {
         'elevation_gain_m': elevationGainM,
         'activity': activity,
         'updated_at': updatedAt?.toIso8601String(),
+        'preview_segments': [
+          for (final s in previewSegments) {'c': s.category, 'd': s.path},
+        ],
       };
 
   /// Décode une entrée de `/api/routes`. Tolérant : ce qui manque vaut zéro, ce
@@ -68,6 +98,7 @@ class RouteSummary {
       updatedAt: raw['updated_at'] is String
           ? DateTime.tryParse(raw['updated_at'] as String)
           : null,
+      previewSegments: RoutePreviewSegment.listFrom(raw['preview_segments']),
     );
   }
 

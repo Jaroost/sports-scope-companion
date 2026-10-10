@@ -17,20 +17,25 @@ Future<void> choosePreset(
 ) async {
   final key = await showModalBottomSheet<String>(
     context: context,
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final preset in settings.settings.presets)
-            ListTile(
-              leading: presetLeading(preset),
-              title: Text(preset.name),
-              subtitle: presetSubtitle(context, preset),
-              isThreeLine: preset.description != null,
-              selected: preset.key == settings.preset.key,
-              onTap: () => Navigator.of(context).pop(preset.key),
-            ),
-        ],
+    // À l'écoute du magasin : un rafraîchissement lancé à l'ouverture de la feuille
+    // (`_HomePageState._syncProfiles`) met la liste à jour pendant qu'elle est ouverte.
+    builder: (context) => ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final preset in settings.settings.presets)
+              ListTile(
+                leading: presetLeading(preset),
+                title: Text(preset.name),
+                subtitle: presetSubtitle(context, preset),
+                isThreeLine: preset.description != null,
+                selected: preset.key == settings.preset.key,
+                onTap: () => Navigator.of(context).pop(preset.key),
+              ),
+          ],
+        ),
       ),
     ),
   );

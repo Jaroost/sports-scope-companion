@@ -34,7 +34,7 @@ class WorkoutSegmentCard extends StatelessWidget {
   final Color? color;
   final Color? textColor;
 
-  static const _title = 'Tronçon';
+  static const _title = 'Bloc';
   static const _upcomingTitle = 'Suivant';
   static const _naturalWidth = 220.0;
   static const _figureSize = 30.0;

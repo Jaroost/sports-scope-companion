@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../dashboard/companion_settings_store.dart';
+import '../dashboard/preset_picker.dart';
 import '../ui/formats.dart';
 import 'training_program.dart';
 import 'training_program_catalog_fetch.dart';
@@ -21,10 +23,15 @@ class WorkoutPickerSheet extends StatefulWidget {
   const WorkoutPickerSheet({
     super.key,
     required this.catalog,
+    this.settings,
     this.fetch = const TrainingProgramCatalogFetch(),
   });
 
   final TrainingProgramCatalogStore catalog;
+
+  /// Les profils de sortie, pour **choisir celui qui part** depuis cette feuille — le même
+  /// que dans `NavigationPickerSheet`. `null` : pas de ligne de profil.
+  final CompanionSettingsStore? settings;
   final TrainingProgramCatalogFetch fetch;
 
   @override
@@ -72,6 +79,41 @@ class _WorkoutPickerSheetState extends State<WorkoutPickerSheet> {
     Navigator.of(context).pop(program);
   }
 
+  /// Changer de profil sans quitter le sélecteur : la feuille de choix se pose par-dessus
+  /// celle-ci. Même geste que `NavigationPickerSheet._changePreset`.
+  Future<void> _changePreset() async {
+    await choosePreset(context, widget.settings!);
+    if (mounted) setState(() {});
+  }
+
+  /// Le profil qui va partir, en tête. Paraît **seulement s'il y a un choix** (plus d'un
+  /// profil) : à une seule entrée, la ligne ne serait que du bruit — même seuil que
+  /// `NavigationPickerSheet`. À l'écoute du magasin : un rafraîchissement des profils lancé
+  /// à l'ouverture (`_HomePageState._syncProfiles`) met la ligne à jour.
+  Widget _presetTile() {
+    final settings = widget.settings!;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        if (!settings.hasChoice) return const SizedBox.shrink();
+        final preset = settings.preset;
+        return Column(
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: presetLeading(preset),
+              title: Text(preset.name),
+              subtitle: Text(describePreset(preset)),
+              trailing: const Icon(Icons.unfold_more),
+              onTap: _changePreset,
+            ),
+            const Divider(),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final programs = widget.catalog.programs;
@@ -87,6 +129,7 @@ class _WorkoutPickerSheetState extends State<WorkoutPickerSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.settings != null) _presetTile(),
           _header(),
           _notice(),
           Flexible(
@@ -183,7 +226,7 @@ class _WorkoutPickerSheetState extends State<WorkoutPickerSheet> {
       title: Text(program.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         '${formatDuration(Duration(seconds: program.durationSeconds))} · '
-        '${program.segmentCount} tronçon${program.segmentCount > 1 ? 's' : ''}',
+        '${program.segmentCount} bloc${program.segmentCount > 1 ? 's' : ''}',
       ),
       enabled: _resolving == null,
       onTap: () => _pick(program),

@@ -23,6 +23,7 @@ import 'devices/sensor_status_strip.dart';
 import 'devices/sensors_page.dart';
 import 'drivetrain.dart';
 import 'navigation/handoff_exchange.dart';
+import 'navigation/screen_dimmer.dart';
 import 'navigation/navigation_picker_sheet.dart';
 import 'navigation/navigation_target.dart';
 import 'navigation/route_catalog_fetch.dart';
@@ -34,6 +35,7 @@ import 'phone/rider_compass.dart';
 import 'ride/climb_debug_page.dart';
 import 'ride/radar_debug_page.dart';
 import 'ride/ride_shell_page.dart';
+import 'ride/blocks/block_card.dart' show BlockCard;
 import 'recording/gps_source.dart';
 import 'recording/recording_card.dart';
 import 'recording/ride_recorder.dart';
@@ -363,10 +365,8 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
     return MaterialApp(
       title: 'Sports Scope',
       navigatorKey: _navigatorKey,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      theme: _appTheme(),
+      navigatorObservers: [routeObserver],
       home: HomePage(
         devices: widget.devices,
         settings: widget.settings,
@@ -619,6 +619,55 @@ Future<void> _tellRecordingFailed(BuildContext context, String message) async {
 /// bouton « Naviguer », l'état des capteurs connus en une rangée d'icônes, et
 /// les quelques cartes qui disent ce qui manquera sur la route (session du
 /// site, seuils, enregistrement).
+/// Prévient les écrans qui en dépendent (l'accueil) quand une page se pose par-dessus ou se
+/// retire : c'est ce qui permet de rendre la veille à la page ouverte, et de la reprendre.
+///
+/// Limité aux **pages** (`PageRoute`) : une feuille du bas ou une boîte de dialogue ne rend pas
+/// la veille — on est encore en train de choisir sur l'accueil.
+final RouteObserver<PageRoute<dynamic>> routeObserver = RouteObserver<PageRoute<dynamic>>();
+
+/// Le thème de l'appli : **sombre**, comme le tableau de bord de sortie et le site, avec
+/// l'orange pour tout ce qui se touche (boutons pleins et flottants, curseurs, cases). Le
+/// vert d'état « connecté » (`Colors.teal`) n'en fait pas partie : c'est un signal, pas un
+/// accent.
+///
+/// `primary` est posé à la main : `ColorScheme.fromSeed` en sombre en tire un orange pâle
+/// (pêche), qui ne ressemble plus à un bouton orange.
+ThemeData _appTheme() {
+  const orange = Color(0xFFFF9800);
+  // Le fond de la sortie : un anthracite presque noir pour la page, `BlockCard.background`
+  // pour les cartes — c'est ce qui fait lire l'accueil et la navigation comme une seule appli.
+  // Posés à la main : le thème sombre généré depuis une teinte orange donne un brun chaud, plus
+  // clair, qui ne ressemble pas au tableau de bord.
+  const page = Color(0xFF0F1113);
+  const card = BlockCard.background;
+  const raised = Color(0xFF2A2E33);
+  final scheme = ColorScheme.fromSeed(seedColor: orange, brightness: Brightness.dark).copyWith(
+    primary: orange,
+    onPrimary: Colors.black,
+    surface: page,
+    surfaceContainerLowest: page,
+    surfaceContainerLow: card,
+    surfaceContainer: card,
+    surfaceContainerHigh: raised,
+    surfaceContainerHighest: raised,
+    surfaceTint: Colors.transparent,
+  );
+  return ThemeData(
+    colorScheme: scheme,
+    useMaterial3: true,
+    scaffoldBackgroundColor: page,
+    appBarTheme: const AppBarTheme(backgroundColor: page, surfaceTintColor: Colors.transparent),
+    cardTheme: const CardThemeData(color: card, surfaceTintColor: Colors.transparent),
+    bottomSheetTheme: const BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent),
+    dialogTheme: const DialogThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: orange,
+      foregroundColor: Colors.black,
+    ),
+  );
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
@@ -701,7 +750,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with RouteAware {
   final _drivetrain = Drivetrain.road;
 
   var _adapterState = BluetoothAdapterState.unknown;
@@ -816,6 +865,24 @@ class _HomePageState extends State<HomePage> {
     ]);
   }
 
+  /// Relit les profils (et le budget de charge) sur le site, **en tâche de fond**, quand on
+  /// touche l'un des deux gros boutons du bas — Naviguer ou Entraînement. C'est le
+  /// moment où l'on s'apprête à partir : un profil retouché sur l'ordinateur y arrive sans
+  /// attendre le prochain lancement de l'appli.
+  ///
+  /// Ne bloque rien : la feuille s'ouvre tout de suite, et la requête (un WebView hors écran,
+  /// environ une seconde) finit pendant qu'on choisit — avant d'avoir touché « Partir » en
+  /// pratique. Une seule requête à la fois (un second tap pendant la première la rejoint),
+  /// et muette comme celle du lancement : un échec garde le cache, rien à dire à l'écran.
+  Future<void>? _settingsSync;
+
+  void _syncProfiles() {
+    _settingsSync ??= refreshCompanionSettings(
+      widget.settings,
+      trainingBudget: widget.trainingBudget,
+    ).then<void>((_) {}).whenComplete(() => _settingsSync = null);
+  }
+
   Future<void> _fetchRoutes() async {
     final result = await const RouteCatalogFetch().run();
     if (result.status != RouteFetchStatus.ok) return;
@@ -849,8 +916,34 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// L'accueil garde l'écran allumé tant qu'il est **sous les yeux** : on y prépare sa sortie
+  /// (profil, itinéraire, capteurs), et un téléphone qui s'endort au milieu d'un choix fait
+  /// perdre le fil. Les pages qu'on ouvre par-dessus décident de leur veille elles-mêmes
+  /// (`didPushNext` la rend), et on la reprend au retour (`didPopNext`).
+  final _screen = ScreenDimmer();
+
+  void _keepAwake(bool on) => unawaited(_screen.setKeepScreenOn(on));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) routeObserver.subscribe(this, route);
+  }
+
+  @override
+  void didPush() => _keepAwake(true);
+
+  @override
+  void didPopNext() => _keepAwake(true);
+
+  @override
+  void didPushNext() => _keepAwake(false);
+
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
+    _keepAwake(false);
     widget.session.removeListener(_onSessionChanged);
     _adapterSub?.cancel();
     // Le hub n'est pas fermé ici : il survit à cet écran.
@@ -872,6 +965,7 @@ class _HomePageState extends State<HomePage> {
   /// une permission et pose la question de l'enregistrement, deux choses qui
   /// n'ont rien à faire dans un sélecteur.
   Future<void> _chooseNavigation() async {
+    _syncProfiles();
     final target = await showModalBottomSheet<NavigationTarget>(
       context: context,
       isScrollControlled: true,
@@ -897,10 +991,14 @@ class _HomePageState extends State<HomePage> {
   /// [WorkoutPickerSheet] l'a fait en le choisissant, pas la peine de le
   /// redemander au site.
   Future<void> _startWorkout() async {
+    _syncProfiles();
     final program = await showModalBottomSheet<TrainingProgram>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => WorkoutPickerSheet(catalog: widget.trainingPrograms),
+      builder: (_) => WorkoutPickerSheet(
+        catalog: widget.trainingPrograms,
+        settings: widget.settings,
+      ),
     );
 
     if (program == null || !mounted) return;
@@ -914,11 +1012,6 @@ class _HomePageState extends State<HomePage> {
   /// d'ici. Le sélecteur de navigation le rappelle et le laisse changer une
   /// dernière fois, mais c'est la même feuille ([choosePreset]) aux deux
   /// endroits.
-  Future<void> _choosePreset() async {
-    await choosePreset(context, widget.settings);
-    if (mounted) setState(() {});
-  }
-
   Future<void> _navigate(NavigationTarget target) => openNavigation(
         context,
         target: target,
@@ -1020,15 +1113,6 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.settings.hasChoice) ...[
-            FloatingActionButton.extended(
-              heroTag: 'choosePreset',
-              onPressed: _choosePreset,
-              icon: presetLeading(widget.settings.preset),
-              label: Text(widget.settings.preset.name),
-            ),
-            const SizedBox(width: 12),
-          ],
           FloatingActionButton.extended(
             heroTag: 'navigate',
             onPressed: _chooseNavigation,
@@ -1036,15 +1120,11 @@ class _HomePageState extends State<HomePage> {
             label: const Text('Naviguer'),
           ),
           const SizedBox(width: 12),
-          // Icône seule, pas « extended » comme les deux précédents : un
-          // programme d'entraînement est un départ moins fréquent qu'une
-          // navigation, il n'a pas à réclamer autant de largeur sur un petit
-          // écran déjà partagé entre deux ou trois boutons.
-          FloatingActionButton(
+          FloatingActionButton.extended(
             heroTag: 'workout',
             onPressed: _startWorkout,
-            tooltip: 'Entraînement',
-            child: const Icon(Icons.timer_outlined),
+            icon: const Icon(Icons.timer_outlined),
+            label: const Text('Entraînement'),
           ),
         ],
       ),

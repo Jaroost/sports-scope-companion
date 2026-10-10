@@ -7,9 +7,10 @@ import 'nav_session.dart';
 import 'navigation_target.dart';
 import 'route_catalog_fetch.dart';
 import 'route_catalog_store.dart';
+import 'route_preview.dart';
 import 'route_summary.dart';
 
-/// Ce qu'on navigue : un itinéraire du compte, un lien reçu ailleurs, ou rien.
+/// Ce qu'on navigue : un itinéraire du compte, ou rien.
 ///
 /// La feuille **rend une cible** et n'ouvre rien elle-même : ouvrir la
 /// navigation demande une permission et peut poser la question de
@@ -46,13 +47,10 @@ class NavigationPickerSheet extends StatefulWidget {
 }
 
 class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
-  final _link = TextEditingController();
-
   /// `null` tant que le site n'a pas répondu. Ne dit rien de ce qui est affiché
   /// — le cache, lui, est là dès l'ouverture.
   RouteFetchStatus? _status;
   bool _refreshing = false;
-  String? _linkError;
 
   /// Le tracé que la page de navigation a laissé derrière elle, lu dans son
   /// stockage au rafraîchissement. Rien en cache ici : voir [RouteCatalogFetch].
@@ -62,12 +60,6 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
   void initState() {
     super.initState();
     _refresh();
-  }
-
-  @override
-  void dispose() {
-    _link.dispose();
-    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -128,16 +120,6 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
       trailing: const Icon(Icons.unfold_more),
       onTap: _changePreset,
     );
-  }
-
-  void _pickPastedLink() {
-    final uri = Uri.tryParse(_link.text.trim());
-    final target = uri == null ? null : NavigationTarget.parse(uri);
-    if (target == null) {
-      setState(() => _linkError = 'Ce lien ne mène pas à un itinéraire.');
-      return;
-    }
-    _pick(target);
   }
 
   @override
@@ -218,27 +200,6 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
                       itemBuilder: (context, i) => _routeTile(routes[i]),
                     ),
                   ),
-          ),
-          const Divider(),
-          TextField(
-            controller: _link,
-            autocorrect: false,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(
-              labelText: 'Ou un lien d\'itinéraire partagé',
-              hintText: 'https://sports.logicraft.ch/routes/…',
-              errorText: _linkError,
-            ),
-            onChanged: (_) {
-              if (_linkError != null) setState(() => _linkError = null);
-            },
-            onSubmitted: (_) => _pickPastedLink(),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _pickPastedLink,
-            icon: const Icon(Icons.navigation),
-            label: const Text('Naviguer ce lien'),
           ),
         ],
       ),
@@ -328,8 +289,7 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
     final message = switch (_status) {
       null => 'Chargement…',
       RouteFetchStatus.ok => 'Aucun itinéraire enregistré sur le site.',
-      _ => 'Rien en mémoire. Le lien d\'un itinéraire partagé marche '
-          'quand même.',
+      _ => 'Rien en mémoire.',
     };
 
     return Padding(
@@ -341,7 +301,10 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
   Widget _routeTile(RouteSummary route) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(_iconFor(route.activity)),
+      leading: RoutePreview(
+        segments: route.previewSegments,
+        fallback: _iconFor(route.activity),
+      ),
       title: Text(route.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         '${formatDistance(route.distanceM)} · '
