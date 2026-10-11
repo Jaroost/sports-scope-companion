@@ -350,8 +350,8 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
     switch (download?.status) {
       case BackgroundDownloadStatus.running:
         return IconButton(
-          tooltip: 'Annuler le téléchargement',
-          onPressed: () => downloads.cancel(token),
+          tooltip: 'Voir le téléchargement',
+          onPressed: () => downloads.open(context, token),
           icon: Stack(
             alignment: Alignment.center,
             children: [
@@ -377,14 +377,14 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
       case BackgroundDownloadStatus.failed:
         return IconButton(
           tooltip: 'Échec du téléchargement — réessayer',
-          onPressed: downloads.busy ? null : () => downloads.start(token),
+          onPressed: downloads.busy ? null : () => downloads.open(context, token),
           icon: const Icon(Icons.error_outline, color: Colors.orange),
         );
       case null:
         return IconButton(
-          tooltip: 'Télécharger la carte hors ligne',
+          tooltip: 'Carte hors ligne (choisir les fonds)',
           // Un seul à la fois : voir `OfflineBackgroundDownloads`.
-          onPressed: downloads.busy ? null : () => downloads.start(token),
+          onPressed: downloads.busy ? null : () => downloads.open(context, token),
           icon: const Icon(Icons.download_for_offline_outlined),
         );
     }

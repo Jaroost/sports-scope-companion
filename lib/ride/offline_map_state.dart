@@ -58,7 +58,40 @@ class OfflineMapState {
     required this.layers,
     this.phase = '',
     this.missing = false,
+    this.loading = false,
   });
+
+  /// Page de téléchargement pas encore chargée (téléchargement lancé depuis la liste, avant
+  /// que le site ait lu le tracé) : la boîte dit alors « chargement » plutôt que de
+  /// proposer un départ qui ne ferait rien. Jamais envoyé par le site.
+  const OfflineMapState.loading()
+      : supported = true,
+        ready = false,
+        stale = false,
+        downloading = false,
+        pct = 0,
+        mb = 0,
+        tiles = 0,
+        errored = false,
+        layers = const [],
+        phase = '',
+        missing = false,
+        loading = true;
+
+  /// Échec avant même d'avoir pu lire le tracé (réseau, itinéraire introuvable).
+  const OfflineMapState.failed()
+      : supported = true,
+        ready = false,
+        stale = false,
+        downloading = false,
+        pct = 0,
+        mb = 0,
+        tiles = 0,
+        errored = true,
+        layers = const [],
+        phase = '',
+        missing = false,
+        loading = false;
 
   /// Faux hors itinéraire (rien à archiver) ou contre une page trop ancienne
   /// pour connaître ce message : dans les deux cas, la commande ne doit pas
@@ -86,6 +119,8 @@ class OfflineMapState {
   /// (itinéraire sur deux pays : le fond suisse est là, pas encore le français). Faux
   /// contre un site plus ancien : on retombe sur [ready] et [stale] seuls.
   final bool missing;
+
+  final bool loading;
 
   /// L'étape du téléchargement, déjà traduite par le site (« IGN plan — Assemblage
   /// de l'archive »). Vide hors téléchargement, ou contre un site plus ancien : la

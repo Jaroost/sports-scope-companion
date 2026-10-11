@@ -51,6 +51,7 @@ class OfflineDownloadDialog extends StatelessWidget {
     return ValueListenableBuilder<OfflineMapState?>(
       valueListenable: state,
       builder: (context, value, _) => AlertDialog(
+        scrollable: true,
         title: const Text('Carte hors ligne'),
         content: SizedBox(
           width: double.maxFinite,
@@ -62,6 +63,19 @@ class OfflineDownloadDialog extends StatelessWidget {
   }
 
   Widget _content(OfflineMapState? value) {
+    if (value != null && value.loading) {
+      return const Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 12),
+          Expanded(child: Text('Chargement de l\'itinéraire…')),
+        ],
+      );
+    }
     if (value == null || !value.supported) {
       return const Text(
         'Rien à archiver ici : reviens sur la carte, avec un itinéraire '
@@ -151,7 +165,7 @@ class OfflineDownloadDialog extends StatelessWidget {
       onPressed: () => Navigator.of(context).pop(),
       child: const Text('Fermer'),
     );
-    if (value == null || !value.supported) return [close];
+    if (value == null || !value.supported || value.loading) return [close];
 
     if (value.downloading) {
       return [
