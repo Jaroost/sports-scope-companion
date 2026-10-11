@@ -4,6 +4,7 @@ import '../dashboard/companion_settings_store.dart';
 import '../dashboard/preset_picker.dart';
 import '../ui/formats.dart';
 import 'nav_session.dart';
+import 'offline_background_download.dart';
 import 'navigation_target.dart';
 import 'route_catalog_fetch.dart';
 import 'route_catalog_store.dart';
@@ -299,19 +300,84 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
   }
 
   Widget _routeTile(RouteSummary route) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: RoutePreview(
-        segments: route.previewSegments,
-        fallback: _iconFor(route.activity),
-      ),
-      title: Text(route.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        '${formatDistance(route.distanceM)} · '
-        '${route.elevationGainM.round()} m D+',
-      ),
-      onTap: () => _pickRoute(route),
+    return ListenableBuilder(
+      listenable: OfflineBackgroundDownloads.instance,
+      builder: (context, _) {
+        final downloads = OfflineBackgroundDownloads.instance;
+        final download = downloads.of(route.shareToken);
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: RoutePreview(
+            segments: route.previewSegments,
+            fallback: _iconFor(route.activity),
+          ),
+          title: Text(route.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(
+            download?.status == BackgroundDownloadStatus.running &&
+                    download!.phase.isNotEmpty
+                ? '${download.pct} % · ${download.phase}'
+                : '${formatDistance(route.distanceM)} · '
+                    '${route.elevationGainM.round()} m D+',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: _offlineButton(route, downloads, download),
+          onTap: () => _pickRoute(route),
+        );
+      },
     );
+  }
+
+  /// Télécharger la carte hors ligne **sans quitter la liste** : un WebView
+  /// invisible fait le travail (`OfflineBackgroundDownloads`). Le bouton suit son
+  /// état — téléchargement (tap = annuler), prêt, échec (tap = réessayer).
+  Widget _offlineButton(
+    RouteSummary route,
+    OfflineBackgroundDownloads downloads,
+    BackgroundDownload? download,
+  ) {
+    final token = route.shareToken;
+    switch (download?.status) {
+      case BackgroundDownloadStatus.running:
+        return IconButton(
+          tooltip: 'Annuler le téléchargement',
+          onPressed: () => downloads.cancel(token),
+          icon: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  // Indéterminé tant que la page n'a pas annoncé de progression.
+                  value: download!.pct > 0 ? download.pct / 100 : null,
+                ),
+              ),
+              const Icon(Icons.close, size: 14),
+            ],
+          ),
+        );
+      case BackgroundDownloadStatus.done:
+        return const IconButton(
+          tooltip: 'Carte hors ligne prête',
+          onPressed: null,
+          icon: Icon(Icons.download_done, color: Colors.green),
+        );
+      case BackgroundDownloadStatus.failed:
+        return IconButton(
+          tooltip: 'Échec du téléchargement — réessayer',
+          onPressed: downloads.busy ? null : () => downloads.start(token),
+          icon: const Icon(Icons.error_outline, color: Colors.orange),
+        );
+      case null:
+        return IconButton(
+          tooltip: 'Télécharger la carte hors ligne',
+          // Un seul à la fois : voir `OfflineBackgroundDownloads`.
+          onPressed: downloads.busy ? null : () => downloads.start(token),
+          icon: const Icon(Icons.download_for_offline_outlined),
+        );
+    }
   }
 
   static IconData _iconFor(String? activity) => switch (activity) {

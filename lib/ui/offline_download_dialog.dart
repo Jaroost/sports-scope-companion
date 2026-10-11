@@ -75,7 +75,7 @@ class OfflineDownloadDialog extends StatelessWidget {
         children: [
           LinearProgressIndicator(value: value.pct / 100),
           const SizedBox(height: 8),
-          Text('${value.pct} %'),
+          Text(value.phase.isEmpty ? '${value.pct} %' : '${value.pct} % · ${value.phase}'),
         ],
       );
     }
@@ -126,6 +126,12 @@ class OfflineDownloadDialog extends StatelessWidget {
         'carte hors ligne ne couvre plus tout l\'itinéraire.',
       );
     }
+    if (value.ready && value.missing) {
+      return const Text(
+        'Une partie du trajet n\'a pas encore sa carte (autre pays) : '
+        'télécharge-la pour couvrir tout l\'itinéraire.',
+      );
+    }
     if (value.ready) {
       return const Text('La carte de ce trajet est prête pour la route.');
     }
@@ -154,7 +160,7 @@ class OfflineDownloadDialog extends StatelessWidget {
       ];
     }
 
-    final needsDownload = !value.ready || value.stale;
+    final needsDownload = !value.ready || value.stale || value.missing;
     // Rien de coché ne doit pas pouvoir se lancer — même garde que le bouton
     // du panneau web (`offlineNothingSelected`). Absent des layers (site plus
     // ancien) : toujours vrai, comme avant ce réglage.

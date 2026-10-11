@@ -56,6 +56,8 @@ class OfflineMapState {
     required this.tiles,
     required this.errored,
     required this.layers,
+    this.phase = '',
+    this.missing = false,
   });
 
   /// Faux hors itinéraire (rien à archiver) ou contre une page trop ancienne
@@ -80,6 +82,17 @@ class OfflineMapState {
 
   final bool errored;
 
+  /// Une couche cochée reste à télécharger alors qu'une autre archive est déjà prête
+  /// (itinéraire sur deux pays : le fond suisse est là, pas encore le français). Faux
+  /// contre un site plus ancien : on retombe sur [ready] et [stale] seuls.
+  final bool missing;
+
+  /// L'étape du téléchargement, déjà traduite par le site (« IGN plan — Assemblage
+  /// de l'archive »). Vide hors téléchargement, ou contre un site plus ancien : la
+  /// boîte n'affiche alors que le pourcentage. Ce sont les étapes après les tuiles
+  /// qui la rendent utile — la barre y reste à 100 % pendant que le travail continue.
+  final String phase;
+
   /// Les fonds archivables et leur sélection courante. Vide contre un site plus ancien
   /// que ce réglage — la boîte replie alors sur son texte d'avant (fond actif, implicite).
   final List<OfflineMapLayer> layers;
@@ -96,6 +109,8 @@ class OfflineMapState {
       mb: json['mb'] is num ? (json['mb'] as num).toDouble() : 0,
       tiles: json['tiles'] is num ? (json['tiles'] as num).toInt() : 0,
       errored: json['errored'] == true,
+      missing: json['missing'] == true,
+      phase: json['phase'] is String ? json['phase'] as String : '',
       layers: rawLayers is List
           ? rawLayers.map(OfflineMapLayer.parse).whereType<OfflineMapLayer>().toList()
           : const [],
