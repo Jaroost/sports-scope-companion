@@ -381,6 +381,7 @@ sealed class RidePageSpec {
     this.key,
     this.leaveButton = false,
     this.hideWorkoutBadge = false,
+    this.hideOnDataSaver = false,
   });
 
   final String title;
@@ -442,6 +443,14 @@ sealed class RidePageSpec {
   /// **Faux par défaut** : absent, la pastille reste visible comme avant.
   final bool hideWorkoutBadge;
 
+  /// Absente du menu ⋮ — et du défilement qu'une condition lui ferait rejoindre
+  /// — tant que l'économie de données est active : une page qui ne montre que
+  /// ce que le réseau apporte (la météo) n'aurait rien à dire. Réservée aux
+  /// pages rangées derrière le menu (`menu`) : le site ne l'écrit pas sinon, et
+  /// on l'ignore ici de même, pour qu'une page du défilement ne bouge jamais
+  /// d'index au gré d'un interrupteur. **Faux par défaut.**
+  final bool hideOnDataSaver;
+
   static RidePageSpec? parse(Object? raw) {
     if (raw is! Map) return null;
     final title = raw['title'] is String ? raw['title'] as String : null;
@@ -458,6 +467,7 @@ sealed class RidePageSpec {
         : null;
     final leaveButton = raw['leave_button'] == true;
     final hideWorkoutBadge = raw['hide_workout_badge'] == true;
+    final hideOnDataSaver = menu && raw['hide_on_data_saver'] == true;
 
     return switch (raw['kind']) {
       // Jamais derrière le menu, et pas par oubli : la carte est le WebView
@@ -476,6 +486,7 @@ sealed class RidePageSpec {
           key: key,
           leaveButton: leaveButton,
           hideWorkoutBadge: hideWorkoutBadge,
+          hideOnDataSaver: hideOnDataSaver,
         ),
       'list' => ListPageSpec.parse(
           raw,
@@ -488,6 +499,7 @@ sealed class RidePageSpec {
           key: key,
           leaveButton: leaveButton,
           hideWorkoutBadge: hideWorkoutBadge,
+          hideOnDataSaver: hideOnDataSaver,
         ),
       'laps' => LapListPageSpec.parse(
           raw,
@@ -500,6 +512,7 @@ sealed class RidePageSpec {
           key: key,
           leaveButton: leaveButton,
           hideWorkoutBadge: hideWorkoutBadge,
+          hideOnDataSaver: hideOnDataSaver,
         ),
       _ => null,
     };
@@ -572,6 +585,7 @@ class GridPageSpec extends RidePageSpec {
     super.key,
     super.leaveButton,
     super.hideWorkoutBadge,
+    super.hideOnDataSaver,
   });
 
   final int rows;
@@ -600,6 +614,7 @@ class GridPageSpec extends RidePageSpec {
     String? key,
     bool leaveButton = false,
     bool hideWorkoutBadge = false,
+    bool hideOnDataSaver = false,
   }) {
     final rows = _gridSide(raw['rows']);
     final cols = _gridSide(raw['cols']);
@@ -624,6 +639,7 @@ class GridPageSpec extends RidePageSpec {
       key: key,
       leaveButton: leaveButton,
       hideWorkoutBadge: hideWorkoutBadge,
+      hideOnDataSaver: hideOnDataSaver,
     );
   }
 }
@@ -710,6 +726,7 @@ class ListPageSpec extends RidePageSpec {
     super.key,
     super.leaveButton,
     super.hideWorkoutBadge,
+    super.hideOnDataSaver,
   });
 
   final List<ListBlockPlacement> blocks;
@@ -734,6 +751,7 @@ class ListPageSpec extends RidePageSpec {
     String? key,
     bool leaveButton = false,
     bool hideWorkoutBadge = false,
+    bool hideOnDataSaver = false,
   }) {
     final cols = raw['cols'] is num
         ? (raw['cols'] as num).toInt().clamp(1, maxCols)
@@ -755,6 +773,7 @@ class ListPageSpec extends RidePageSpec {
       key: key,
       leaveButton: leaveButton,
       hideWorkoutBadge: hideWorkoutBadge,
+      hideOnDataSaver: hideOnDataSaver,
     );
   }
 }
@@ -825,6 +844,7 @@ class LapListPageSpec extends RidePageSpec {
     super.key,
     super.leaveButton,
     super.hideWorkoutBadge,
+    super.hideOnDataSaver,
   });
 
   final String series;
@@ -845,6 +865,7 @@ class LapListPageSpec extends RidePageSpec {
     String? key,
     bool leaveButton = false,
     bool hideWorkoutBadge = false,
+    bool hideOnDataSaver = false,
   }) {
     final layout = LapPageLayout.parse(raw);
     // Une page de tours sans le moindre composant n'a rien à montrer une fois
@@ -862,6 +883,7 @@ class LapListPageSpec extends RidePageSpec {
       key: key,
       leaveButton: leaveButton,
       hideWorkoutBadge: hideWorkoutBadge,
+      hideOnDataSaver: hideOnDataSaver,
     );
   }
 }

@@ -468,7 +468,8 @@ class _RideShellPageState extends State<RideShellPage>
   /// [_ridePages], pas ici, elle n'a donc pas besoin d'être allée chercher.
   List<RidePageSpec> get _menuPages => [
         for (final page in _baseMenuPages)
-          if (!_manuallyShown.contains(page) &&
+          if (!_hiddenByDataSaver(page) &&
+              !_manuallyShown.contains(page) &&
               (!_conditionalPages.contains(page) ||
                   !_activeConditional.contains(page) ||
                   _manuallyHiddenConditional.contains(page)))
@@ -1345,7 +1346,15 @@ class _RideShellPageState extends State<RideShellPage>
     return remaining.any((p) => p is! MapPageSpec);
   }
 
-  bool _conditionMet(RidePageSpec page) => switch (page.menuCondition!) {
+  /// [page] est-elle écartée du menu (et du défilement qu'une condition lui
+  /// ferait rejoindre) parce que l'économie de données est active ? Lue à
+  /// chaque accès : l'interrupteur se bascule en pleine sortie, depuis le menu.
+  bool _hiddenByDataSaver(RidePageSpec page) =>
+      page.hideOnDataSaver && widget.dataSaver.enabled;
+
+  bool _conditionMet(RidePageSpec page) =>
+      !_hiddenByDataSaver(page) &&
+      switch (page.menuCondition!) {
         PageMenuCondition.routeActive => _nav.value?.onRoute == true,
         PageMenuCondition.descending => _updateDescending(),
         PageMenuCondition.nearCol => _nearCol(),
