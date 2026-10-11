@@ -114,15 +114,29 @@ class OfflineBackgroundDownloads extends ChangeNotifier {
     );
     _dialogOpen = false;
 
-    // Fermée sans avoir rien lancé (ou après la fin) : plus rien à attendre.
-    if (_active == token && !_started) {
-      _downloads.remove(token);
-      _teardown();
-      notifyListeners();
-    } else if (_active == token && _downloads[token]?.status != BackgroundDownloadStatus.running) {
-      _teardown();
-      notifyListeners();
+    // Déjà jeté (fin pendant que la boîte était fermée) : rien à faire.
+    if (_active != token) return;
+    // Un téléchargement en cours continue sans la boîte, la liste en montre l'avancement.
+    if (_downloads[token]?.status == BackgroundDownloadStatus.running) return;
+
+    // Sinon plus rien à attendre : on garde ce que la boîte a montré en dernier — une
+    // carte prête reste verte, une carte supprimée redevient « à télécharger ».
+    final last = state.value;
+    final ready = last != null &&
+        last.supported &&
+        !last.loading &&
+        !last.errored &&
+        last.ready;
+    if (_downloads[token]?.status != BackgroundDownloadStatus.failed) {
+      if (ready) {
+        _downloads[token] =
+            const BackgroundDownload(BackgroundDownloadStatus.done, pct: 100);
+      } else {
+        _downloads.remove(token);
+      }
     }
+    _teardown();
+    notifyListeners();
   }
 
   void _begin(String token) {
@@ -271,6 +285,9 @@ class OfflineBackgroundDownloads extends ChangeNotifier {
     if (status == BackgroundDownloadStatus.failed && state.value?.errored != true) {
       state.value = const OfflineMapState.failed();
     }
+    // Le départ est consommé : une suppression ou un changement de marge qui suit ne doit pas
+    // se lire comme un téléchargement encore en cours.
+    _started = false;
     // La boîte peut encore être ouverte sur « terminé » ou « échec » (et son bouton
     // Supprimer a besoin de la page) : c'est à sa fermeture qu'on jette le WebView.
     if (!_dialogOpen) _teardown();

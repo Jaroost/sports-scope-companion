@@ -369,10 +369,12 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
           ),
         );
       case BackgroundDownloadStatus.done:
-        return const IconButton(
-          tooltip: 'Carte hors ligne prête',
-          onPressed: null,
-          icon: Icon(Icons.download_done, color: Colors.green),
+        // Reste cliquable : c'est par la boîte qu'on élargit la marge, ajoute un fond
+        // d'un autre pays ou supprime la carte.
+        return IconButton(
+          tooltip: 'Carte hors ligne prête — gérer',
+          onPressed: downloads.busy ? null : () => downloads.open(context, token),
+          icon: const Icon(Icons.download_done, color: Colors.green),
         );
       case BackgroundDownloadStatus.failed:
         return IconButton(
