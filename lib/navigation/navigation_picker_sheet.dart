@@ -145,10 +145,7 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (showPreset) ...[
-              _presetTile(),
-              const SizedBox(height: 8),
-            ],
+            if (showPreset) ...[_presetTile(), const SizedBox(height: 8)],
             FilledButton.icon(
               onPressed: () => _pick(const NavigationTarget.free()),
               icon: const Icon(Icons.play_arrow),
@@ -159,50 +156,63 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
       );
     }
 
-    return Padding(
-      // Le clavier quand il est là, la barre de navigation d'Android sinon.
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 8,
-        bottom: MediaQuery.viewInsetsOf(context).bottom +
-            MediaQuery.paddingOf(context).bottom +
-            16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (showPreset) ...[
-            _presetTile(),
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    return SingleChildScrollView(
+      child: Padding(
+        // Le clavier quand il est là, la barre de navigation d'Android sinon.
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 8,
+          bottom:
+              MediaQuery.viewInsetsOf(context).bottom +
+              MediaQuery.paddingOf(context).bottom +
+              16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showPreset) ...[_presetTile(), const Divider()],
+            if (_session != null) _resumeTile(_session!),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.explore),
+              title: const Text('Navigation libre'),
+              subtitle: const Text('Carte et position, sans itinéraire'),
+              onTap: () => _pick(const NavigationTarget.free()),
+            ),
             const Divider(),
+            _header(),
+            _notice(),
+            if (routes.isEmpty)
+              _emptyMessage()
+            else if (landscape)
+              // En paysage il ne reste presque pas de hauteur : une liste plafonnée
+              // à 40 % de l'écran sortait de la feuille avec le reste, et la ligne
+              // en cours de téléchargement n'était plus visible. C'est donc toute
+              // la feuille qui défile, la liste y prenant sa hauteur naturelle.
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: routes.length,
+                itemBuilder: (context, i) => _routeTile(routes[i]),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: routes.length,
+                  itemBuilder: (context, i) => _routeTile(routes[i]),
+                ),
+              ),
           ],
-          if (_session != null) _resumeTile(_session!),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.explore),
-            title: const Text('Navigation libre'),
-            subtitle: const Text('Carte et position, sans itinéraire'),
-            onTap: () => _pick(const NavigationTarget.free()),
-          ),
-          const Divider(),
-          _header(),
-          _notice(),
-          Flexible(
-            child: routes.isEmpty
-                ? _emptyMessage()
-                : ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: routes.length,
-                      itemBuilder: (context, i) => _routeTile(routes[i]),
-                    ),
-                  ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -317,7 +327,7 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
                     download!.phase.isNotEmpty
                 ? '${download.pct} % · ${download.phase}'
                 : '${formatDistance(route.distanceM)} · '
-                    '${route.elevationGainM.round()} m D+',
+                      '${route.elevationGainM.round()} m D+',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -381,11 +391,11 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
   }
 
   static IconData _iconFor(String? activity) => switch (activity) {
-        'cycling' => Icons.directions_bike,
-        'mtb' => Icons.terrain,
-        'hiking' => Icons.hiking,
-        // Le site peut gagner une activité sans que l'appli le sache : une
-        // ligne sans pictogramme vaut mieux qu'une ligne absente.
-        _ => Icons.route,
-      };
+    'cycling' => Icons.directions_bike,
+    'mtb' => Icons.terrain,
+    'hiking' => Icons.hiking,
+    // Le site peut gagner une activité sans que l'appli le sache : une
+    // ligne sans pictogramme vaut mieux qu'une ligne absente.
+    _ => Icons.route,
+  };
 }
