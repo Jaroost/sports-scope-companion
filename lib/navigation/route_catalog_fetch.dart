@@ -117,6 +117,24 @@ class RouteCatalogFetch {
         }
       } catch (e) {}
 
+      // Les cartes hors ligne déjà téléchargées (OPFS, même origine que la navigation) :
+      // `route-<jeton>-<fond>.pmtiles`. Publié À PART et tout de suite — c'est local, il
+      // n'y a aucune raison de l'attendre derrière la réponse du site (jusqu'à 12 s sans
+      // réseau) pour colorer les icônes de la liste. Le fond est le dernier segment, sans
+      // tiret ; le jeton peut en contenir.
+      (async function () {
+        var archives = {};
+        try {
+          var root = await navigator.storage.getDirectory();
+          var dir = await root.getDirectoryHandle('offline-maps');
+          for await (var entry of dir.entries()) {
+            var m = /^route-(.+)-([a-z]+)\\.pmtiles\$/.exec(entry[0]);
+            if (m) (archives[m[1]] = archives[m[1]] || []).push(m[2]);
+          }
+        } catch (e) { /* dossier absent : aucune carte téléchargée */ }
+        try { $_channel.postMessage(JSON.stringify({ kind: 'archives', archives: archives })); } catch (e) {}
+      })();
+
       var send = function (payload) {
         payload.session = session;
         try { $_channel.postMessage(JSON.stringify(payload)); } catch (e) {}
@@ -143,7 +161,9 @@ class RouteCatalogFetch {
     })();
   ''';
 
-  Future<RouteFetchResult> run() async {
+  Future<RouteFetchResult> run({
+    void Function(Map<String, Set<String>> archives)? onArchives,
+  }) async {
     // Économie de données : pas même le WebView hors écran, qui coûterait déjà
     // un chargement de page. Le catalogue en cache reste affiché tel quel.
     if (NetworkPolicy.dataSaverEnabled) {
@@ -171,7 +191,14 @@ class RouteCatalogFetch {
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..addJavaScriptChannel(
           _channel,
-          onMessageReceived: (message) => finish(_decode(message.message)),
+          onMessageReceived: (message) {
+            final archives = _decodeArchives(message.message);
+            if (archives != null) {
+              onArchives?.call(archives);
+              return; // pas la réponse du site : on attend toujours celle-là
+            }
+            finish(_decode(message.message));
+          },
         )
         ..setNavigationDelegate(
           NavigationDelegate(
@@ -225,6 +252,26 @@ class RouteCatalogFetch {
         '${result.routes.length} itinéraire(s), '
         'en cours : ${result.session ?? "aucun"}');
     return result;
+  }
+
+  /// Le message des cartes hors ligne présentes, `null` pour tout autre message.
+  Map<String, Set<String>>? _decodeArchives(String message) {
+    try {
+      final decoded = jsonDecode(message);
+      if (decoded is! Map || decoded['kind'] != 'archives') return null;
+      final raw = decoded['archives'];
+      return {
+        if (raw is Map)
+          for (final e in raw.entries)
+            if (e.key is String && e.value is List)
+              e.key as String: {
+                for (final layer in e.value as List)
+                  if (layer is String) layer,
+              },
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   RouteFetchResult _decode(String message) {

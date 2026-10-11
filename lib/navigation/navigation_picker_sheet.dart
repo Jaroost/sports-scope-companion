@@ -65,7 +65,9 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
 
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
-    final result = await widget.fetch.run();
+    final result = await widget.fetch.run(
+      onArchives: OfflineBackgroundDownloads.instance.noteArchives,
+    );
     if (result.status == RouteFetchStatus.ok) {
       await widget.catalog.record(result.routes);
     }

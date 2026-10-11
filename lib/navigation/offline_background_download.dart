@@ -92,6 +92,29 @@ class OfflineBackgroundDownloads extends ChangeNotifier {
 
   BackgroundDownload? of(String token) => _downloads[token];
 
+  /// Les cartes déjà téléchargées, lues dans le stockage de la page à l'ouverture de la liste
+  /// (jeton → fonds). Colore d'emblée les icônes, sans qu'on ait à ouvrir la boîte. Ne touche ni
+  /// au téléchargement en cours ni à un échec affiché ; une icône « prête » dont l'archive a
+  /// disparu (supprimée depuis la navigation) redevient « à télécharger ».
+  void noteArchives(Map<String, Set<String>> archives) {
+    var changed = false;
+    for (final token in {..._downloads.keys, ...archives.keys}) {
+      if (token == _active) continue;
+      final current = _downloads[token];
+      if (current != null && current.status != BackgroundDownloadStatus.done) continue;
+      final has = archives[token]?.isNotEmpty ?? false;
+      if (has && current == null) {
+        _downloads[token] =
+            const BackgroundDownload(BackgroundDownloadStatus.done, pct: 100);
+        changed = true;
+      } else if (!has && current != null) {
+        _downloads.remove(token);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
   bool get busy => _active != null;
 
   /// Ouvre la boîte de choix des fonds pour [token] — et charge la page derrière si
