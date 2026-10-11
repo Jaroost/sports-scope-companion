@@ -446,9 +446,8 @@ sealed class RidePageSpec {
   /// Absente du menu ⋮ — et du défilement qu'une condition lui ferait rejoindre
   /// — tant que l'économie de données est active : une page qui ne montre que
   /// ce que le réseau apporte (la météo) n'aurait rien à dire. Réservée aux
-  /// pages rangées derrière le menu (`menu`) : le site ne l'écrit pas sinon, et
-  /// on l'ignore ici de même, pour qu'une page du défilement ne bouge jamais
-  /// d'index au gré d'un interrupteur. **Faux par défaut.**
+  /// la carte, qui ne se range ni ne se retire. Une page du défilement sort du
+  /// défilement (sauf si c'est la dernière hors carte). **Faux par défaut.**
   final bool hideOnDataSaver;
 
   static RidePageSpec? parse(Object? raw) {
@@ -467,7 +466,7 @@ sealed class RidePageSpec {
         : null;
     final leaveButton = raw['leave_button'] == true;
     final hideWorkoutBadge = raw['hide_workout_badge'] == true;
-    final hideOnDataSaver = menu && raw['hide_on_data_saver'] == true;
+    final hideOnDataSaver = raw['hide_on_data_saver'] == true;
 
     return switch (raw['kind']) {
       // Jamais derrière le menu, et pas par oubli : la carte est le WebView

@@ -448,9 +448,14 @@ class _RideShellPageState extends State<RideShellPage>
   /// la précèdent à un index stable tant que rien n'est masqué — [_mapPage] se
   /// recalcule quand même à chaque accès, parce qu'une page masquée avant elle
   /// décale bel et bien tout ce qui suit.
-  List<RidePageSpec> get _ridePages => [
+  List<RidePageSpec> get _ridePages => _ridePagesFor(widget.dataSaver.enabled);
+
+  /// [_ridePages] pour un état donné de l'économie de données — séparé pour que
+  /// [_onDataSaverChanged] puisse retrouver la page regardée **avant** la
+  /// bascule, l'interrupteur ayant déjà changé quand l'écouteur est appelé.
+  List<RidePageSpec> _ridePagesFor(bool saver) => [
         for (final page in _baseRidePages)
-          if (!_manuallyHidden.contains(page)) page,
+          if (!_manuallyHidden.contains(page) && !_droppedFromSwipe(page, saver)) page,
         for (final page in _conditionalPages)
           if (_activeConditional.contains(page) &&
               !_manuallyHiddenConditional.contains(page))
@@ -460,6 +465,18 @@ class _RideShellPageState extends State<RideShellPage>
               !(_conditionalPages.contains(page) && _activeConditional.contains(page)))
             page,
       ];
+
+  /// Une page du défilement que l'économie de données écarte — sauf si elle est
+  /// la dernière page hors carte à faire défiler : même garde que
+  /// [_canHide], une sortie ne doit jamais rester sans page de données, quitte
+  /// à montrer une page vide plutôt qu'aucune.
+  bool _droppedFromSwipe(RidePageSpec page, bool saver) =>
+      saver &&
+      page.hideOnDataSaver &&
+      _baseRidePages.any((p) =>
+          p is! MapPageSpec &&
+          !(p.hideOnDataSaver) &&
+          !_manuallyHidden.contains(p));
 
   /// Les pages rangées derrière le menu du moment : celles masquées à la main,
   /// les pages sans condition et non rejointes à la main, les pages
@@ -475,7 +492,7 @@ class _RideShellPageState extends State<RideShellPage>
                   _manuallyHiddenConditional.contains(page)))
             page,
         for (final page in _baseRidePages)
-          if (_manuallyHidden.contains(page)) page,
+          if (_manuallyHidden.contains(page) && !_hiddenByDataSaver(page)) page,
       ];
 
   /// La page ouverte depuis le menu, index dans [_menuPages]. `null` la plupart
@@ -735,6 +752,7 @@ class _RideShellPageState extends State<RideShellPage>
     WidgetsBinding.instance.addObserver(this);
 
     _baseRidePages = _preset.ridePages;
+    widget.dataSaver.addListener(_onDataSaverChanged);
     _baseMenuPages = _preset.menuPages;
     _conditionalPages = [
       for (final page in _baseMenuPages)
@@ -1344,6 +1362,24 @@ class _RideShellPageState extends State<RideShellPage>
   bool _canHide(RidePageSpec page) {
     final remaining = _ridePages.where((p) => !identical(p, page));
     return remaining.any((p) => p is! MapPageSpec);
+  }
+
+  /// L'économie de données vient de basculer : les pages qui la portent
+  /// entrent ou sortent du défilement. Même recomposition sûre que
+  /// [_updateConditionalPages] — la page regardée est retrouvée par identité
+  /// dans l'ancien défilement, puis le nouveau la rattrape ou revient à la carte.
+  void _onDataSaverChanged() {
+    if (!mounted) return;
+    final before = _ridePagesFor(!widget.dataSaver.enabled);
+    final currentSpec =
+        before.isEmpty ? null : before[pageOf(_rawPage, count: before.length)];
+    _setMenuPage(null);
+    setState(() {});
+    _autoReturn = AutoReturnPolicy(
+      mapPage: _mapPage,
+      holdAfterClear: _autoReturn.holdAfterClear,
+    );
+    _reanchorOn(currentSpec);
   }
 
   /// [page] est-elle écartée du menu (et du défilement qu'une condition lui
@@ -2105,6 +2141,7 @@ class _RideShellPageState extends State<RideShellPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.dataSaver.removeListener(_onDataSaverChanged);
     _tick?.cancel();
     _buttonTick?.cancel();
     _compassTick?.cancel();
