@@ -17,6 +17,7 @@ Future<void> showOfflineDownloadDialog(
   required VoidCallback cancel,
   required VoidCallback remove,
   required ValueChanged<String> toggleLayer,
+  ValueChanged<int>? setBuffer,
 }) {
   return showDialog<void>(
     context: context,
@@ -26,6 +27,7 @@ Future<void> showOfflineDownloadDialog(
       cancel: cancel,
       remove: remove,
       toggleLayer: toggleLayer,
+      setBuffer: setBuffer,
     ),
   );
 }
@@ -38,6 +40,7 @@ class OfflineDownloadDialog extends StatelessWidget {
     required this.cancel,
     required this.remove,
     required this.toggleLayer,
+    this.setBuffer,
   });
 
   final ValueListenable<OfflineMapState?> state;
@@ -45,6 +48,9 @@ class OfflineDownloadDialog extends StatelessWidget {
   final VoidCallback cancel;
   final VoidCallback remove;
   final ValueChanged<String> toggleLayer;
+
+  /// Absent : le réglage de marge n'est pas proposé (appelant qui ne sait pas le relayer).
+  final ValueChanged<int>? setBuffer;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +106,7 @@ class OfflineDownloadDialog extends StatelessWidget {
         // Absent contre un site plus ancien que ce réglage (avant les fonds IGN) :
         // la boîte replie alors sur le fond déjà actif, comme avant lui.
         if (value.layers.isNotEmpty) ..._layerTiles(value),
+        if (setBuffer != null && value.bufferChoices.isNotEmpty) _bufferPicker(value),
         _statusLine(value),
       ],
     );
@@ -128,6 +135,33 @@ class OfflineDownloadDialog extends StatelessWidget {
     ];
   }
 
+  /// La marge autour du tracé : plus large = plus de tuiles, donc plus de Mo (l'estimation
+  /// juste en dessous suit). Ne vaut que pour le prochain téléchargement.
+  Widget _bufferPicker(OfflineMapState value) {
+    String label(int m) => m >= 1000 ? '${m / 1000} km' : '$m m';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Marge autour du tracé', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final m in value.bufferChoices)
+                ChoiceChip(
+                  label: Text(label(m)),
+                  selected: m == value.bufferM,
+                  onSelected: (_) => setBuffer!(m),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _statusLine(OfflineMapState value) {
     if (value.errored) {
       return const Text(
@@ -142,7 +176,7 @@ class OfflineDownloadDialog extends StatelessWidget {
     }
     if (value.ready && value.missing) {
       return const Text(
-        'Une partie du trajet n\'a pas encore sa carte (autre pays) : '
+        'Il manque une carte pour ce choix (autre pays ou marge plus large) : '
         'télécharge-la pour couvrir tout l\'itinéraire.',
       );
     }

@@ -59,6 +59,8 @@ class OfflineMapState {
     this.phase = '',
     this.missing = false,
     this.loading = false,
+    this.bufferM = 0,
+    this.bufferChoices = const [],
   });
 
   /// Page de téléchargement pas encore chargée (téléchargement lancé depuis la liste, avant
@@ -76,7 +78,9 @@ class OfflineMapState {
         layers = const [],
         phase = '',
         missing = false,
-        loading = true;
+        loading = true,
+        bufferM = 0,
+        bufferChoices = const [];
 
   /// Échec avant même d'avoir pu lire le tracé (réseau, itinéraire introuvable).
   const OfflineMapState.failed()
@@ -91,7 +95,9 @@ class OfflineMapState {
         layers = const [],
         phase = '',
         missing = false,
-        loading = false;
+        loading = false,
+        bufferM = 0,
+        bufferChoices = const [];
 
   /// Faux hors itinéraire (rien à archiver) ou contre une page trop ancienne
   /// pour connaître ce message : dans les deux cas, la commande ne doit pas
@@ -122,6 +128,11 @@ class OfflineMapState {
 
   final bool loading;
 
+  /// Marge de chaque côté du tracé pour le prochain téléchargement (m), et celles que le site
+  /// propose. Vides contre un site plus ancien : la boîte n'affiche alors pas le réglage.
+  final int bufferM;
+  final List<int> bufferChoices;
+
   /// L'étape du téléchargement, déjà traduite par le site (« IGN plan — Assemblage
   /// de l'archive »). Vide hors téléchargement, ou contre un site plus ancien : la
   /// boîte n'affiche alors que le pourcentage. Ce sont les étapes après les tuiles
@@ -145,6 +156,13 @@ class OfflineMapState {
       tiles: json['tiles'] is num ? (json['tiles'] as num).toInt() : 0,
       errored: json['errored'] == true,
       missing: json['missing'] == true,
+      bufferM: json['bufferM'] is num ? (json['bufferM'] as num).toInt() : 0,
+      bufferChoices: json['bufferChoices'] is List
+          ? [
+              for (final m in json['bufferChoices'] as List)
+                if (m is num) m.toInt(),
+            ]
+          : const [],
       phase: json['phase'] is String ? json['phase'] as String : '',
       layers: rawLayers is List
           ? rawLayers.map(OfflineMapLayer.parse).whereType<OfflineMapLayer>().toList()

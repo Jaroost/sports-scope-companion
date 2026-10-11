@@ -110,6 +110,7 @@ class OfflineBackgroundDownloads extends ChangeNotifier {
       cancel: () => unawaited(_cancel(token)),
       remove: () => unawaited(_command('offlineRemove')),
       toggleLayer: (id) => unawaited(_toggleLayer(id)),
+      setBuffer: (m) => unawaited(_command('offlineSetBuffer', m)),
     );
     _dialogOpen = false;
 
@@ -196,10 +197,10 @@ class OfflineBackgroundDownloads extends ChangeNotifier {
     }
   }
 
-  Future<void> _command(String method) async {
+  Future<void> _command(String method, [Object? argument]) async {
     try {
       await _controller?.runJavaScript(
-        'void (window.sportsScopeCompanion?.$method?.());',
+        'void (window.sportsScopeCompanion?.$method?.(${argument == null ? '' : jsonEncode(argument)}));',
       );
     } catch (e) {
       debugPrint('[hors ligne] commande ignorée : $e');

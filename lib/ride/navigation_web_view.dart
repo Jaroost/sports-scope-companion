@@ -286,6 +286,18 @@ class NavigationWebController {
   Future<void> cancelOfflineDownload() => _offlineCommand('offlineCancel');
   Future<void> removeOfflineDownload() => _offlineCommand('offlineRemove');
 
+  /// Marge de chaque côté du tracé pour le prochain téléchargement (m) — relayé tel quel,
+  /// c'est le site qui n'accepte que les valeurs qu'il propose.
+  Future<void> setOfflineBuffer(int meters) async {
+    try {
+      await webView.runJavaScript(
+        'void (window.sportsScopeCompanion?.offlineSetBuffer?.($meters));',
+      );
+    } catch (e) {
+      debugPrint('[web] marge hors ligne ignorée : $e');
+    }
+  }
+
   /// Coche/décoche un fond pour le prochain téléchargement (`OfflineMapLayer.id`) — même
   /// geste que les cases du panneau web, relayé par `companionBridge.ts`.
   Future<void> toggleOfflineLayer(String id) async {

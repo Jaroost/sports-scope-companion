@@ -1569,6 +1569,7 @@ class _RideShellPageState extends State<RideShellPage>
       cancel: () => unawaited(web.cancelOfflineDownload()),
       remove: () => unawaited(web.removeOfflineDownload()),
       toggleLayer: (id) => unawaited(web.toggleOfflineLayer(id)),
+      setBuffer: (m) => unawaited(web.setOfflineBuffer(m)),
     );
   }
 
@@ -1645,6 +1646,7 @@ class _RideShellPageState extends State<RideShellPage>
       cancel: () => unawaited(web.cancelOfflineDownload()),
       remove: () => unawaited(web.removeOfflineDownload()),
       toggleLayer: (id) => unawaited(web.toggleOfflineLayer(id)),
+      setBuffer: (m) => unawaited(web.setOfflineBuffer(m)),
     ));
     unawaited(web.requestOfflineDownload());
   }
