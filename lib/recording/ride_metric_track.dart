@@ -6,17 +6,21 @@ import 'package:flutter/foundation.dart';
 /// ([RideRecorder.recorded] au moment de la mesure), valeur du capteur.
 @immutable
 class MetricTrackPoint {
-  const MetricTrackPoint(this.elapsedS, this.value);
+  const MetricTrackPoint(this.elapsedS, this.value, {this.moving = true});
 
   final int elapsedS;
   final double value;
 
-  @override
-  bool operator ==(Object other) =>
-      other is MetricTrackPoint && other.elapsedS == elapsedS && other.value == value;
+  /// `false` pour un point pris à l'arrêt : les moyennes l'ignorent, le graphe
+  /// et les maxima le gardent.
+  final bool moving;
 
   @override
-  int get hashCode => Object.hash(elapsedS, value);
+  bool operator ==(Object other) =>
+      other is MetricTrackPoint && other.elapsedS == elapsedS && other.value == value && other.moving == moving;
+
+  @override
+  int get hashCode => Object.hash(elapsedS, value, moving);
 }
 
 /// Accumule la série temporelle d'une mesure de capteur (cardio, puissance)
@@ -77,9 +81,9 @@ class RideMetricTrack {
   /// (`RideStats`), qui l'écarte pour ne pas gonfler la zone la plus basse
   /// d'un temps qui n'a pas été passé à pédaler doucement, une question qui ne
   /// se pose pas ici.
-  void add(int elapsedS, num? value) {
+  void add(int elapsedS, num? value, {bool moving = true}) {
     if (value == null) return;
-    final point = MetricTrackPoint(elapsedS, value.toDouble());
+    final point = MetricTrackPoint(elapsedS, value.toDouble(), moving: moving);
 
     _recent.addLast(point);
     while (_recent.isNotEmpty && point.elapsedS - _recent.first.elapsedS > recentWindowS) {

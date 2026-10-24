@@ -282,6 +282,11 @@ class RideStats {
   // Sommes courantes : les moyennes sont des accesseurs, pour qu'une valeur lue
   // en cours de sortie soit toujours celle des points déjà vus — pas celle d'un
   // total figé au dernier calcul.
+  /// Le dernier intervalle était-il en mouvement ? `null` tant qu'on ne peut
+  /// pas le dire (premier point, ni vitesse ni distance). Lu par l'enregistreur
+  /// pour étiqueter les points des pistes.
+  bool? lastMoving;
+
   int _hrSum = 0;
   int _hrCount = 0;
   double _cadenceSum = 0;
@@ -550,6 +555,12 @@ class RideStats {
       }
     }
 
+    lastMoving = moving;
+    // Les moyennes ne comptent que le temps de roulage, comme [avgSpeedMps] :
+    // un arrêt (inconnu = on roule) ne dilue ni le cardio, ni la puissance, ni
+    // la cadence. Les maxima, eux, restent sur tout ce qui a été mesuré.
+    final rolling = moving != false;
+
     distanceM = point.distanceM;
 
     if (point.hasPosition) {
@@ -575,8 +586,10 @@ class RideStats {
     final altitude = hasBaroAltitude ? point.baroAltitudeM : point.altitudeM;
     if (altitude != null) {
       currentAltitudeM = altitude;
-      _altitudeSum += altitude;
-      _altitudeCount++;
+      if (rolling) {
+        _altitudeSum += altitude;
+        _altitudeCount++;
+      }
       maxAltitudeM =
           maxAltitudeM == null || altitude > maxAltitudeM! ? altitude : maxAltitudeM;
 
@@ -591,8 +604,10 @@ class RideStats {
 
       final grade = gradePercent;
       if (grade != null) {
-        _gradeSum += grade;
-        _gradeCount++;
+        if (rolling) {
+          _gradeSum += grade;
+          _gradeCount++;
+        }
         maxGrade = maxGrade == null || grade > maxGrade! ? grade : maxGrade;
         minGrade = minGrade == null || grade < minGrade! ? grade : minGrade;
       }
@@ -608,8 +623,10 @@ class RideStats {
     final heartRate = point.heartRate;
     if (heartRate != null) {
       hasHeartRate = true;
-      _hrSum += heartRate;
-      _hrCount++;
+      if (rolling) {
+        _hrSum += heartRate;
+        _hrCount++;
+      }
       maxHeartRate = _max(maxHeartRate, heartRate);
       minHeartRate = _min(minHeartRate, heartRate);
       _bucket(hrHistogram, heartRate, hrBucketBpm);
@@ -618,8 +635,10 @@ class RideStats {
     final cadence = point.cadence;
     if (cadence != null) {
       hasCadence = true;
-      _cadenceSum += cadence;
-      _cadenceCount++;
+      if (rolling) {
+        _cadenceSum += cadence;
+        _cadenceCount++;
+      }
       maxCadence = _max(maxCadence, cadence.round());
       minCadence = _min(minCadence, cadence.round());
     }
@@ -627,8 +646,10 @@ class RideStats {
     final power = point.power;
     if (power != null) {
       hasPower = true;
-      _powerSum += power;
-      _powerCount++;
+      if (rolling) {
+        _powerSum += power;
+        _powerCount++;
+      }
       maxPower = _max(maxPower, power);
       minPower = _min(minPower, power);
       _bucket(powerHistogram, power, powerBucketW);
@@ -860,6 +881,7 @@ class RideStats {
     maxAltitudeM = null;
     _altitudeSum = 0;
     _altitudeCount = 0;
+    lastMoving = null;
     _hrSum = _hrCount = 0;
     _cadenceSum = 0;
     _cadenceCount = 0;

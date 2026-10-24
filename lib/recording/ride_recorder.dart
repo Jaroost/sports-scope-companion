@@ -647,12 +647,13 @@ class RideRecorder extends ChangeNotifier {
     // manque — deux sources décalées de plusieurs mètres feraient une marche.
     final altitude = stats.hasBaroAltitude ? point.baroAltitudeM : point.altitudeM;
     if (altitude != null) elevationTrack.add(point.distanceM, altitude);
-    heartRateTrack.add(_recordedSeconds, point.heartRate);
-    powerTrack.add(_recordedSeconds, point.power);
-    cadenceTrack.add(_recordedSeconds, point.cadence);
+    final rolling = stats.lastMoving != false;
+    heartRateTrack.add(_recordedSeconds, point.heartRate, moving: rolling);
+    powerTrack.add(_recordedSeconds, point.power, moving: rolling);
+    cadenceTrack.add(_recordedSeconds, point.cadence, moving: rolling);
     speedTrack.add(_recordedSeconds, point.speedMps);
-    altitudeTrack.add(_recordedSeconds, stats.currentAltitudeM);
-    gradeTrack.add(_recordedSeconds, stats.gradePercent);
+    altitudeTrack.add(_recordedSeconds, stats.currentAltitudeM, moving: rolling);
+    gradeTrack.add(_recordedSeconds, stats.gradePercent, moving: rolling);
     climbRateTrack.add(_recordedSeconds, stats.climbRateMph);
     distanceTrack.add(_recordedSeconds, stats.distanceM);
     ascentTrack.add(_recordedSeconds, stats.ascentM);

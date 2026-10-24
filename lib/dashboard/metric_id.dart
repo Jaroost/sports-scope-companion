@@ -541,7 +541,8 @@ enum MetricId {
   /// tant qu'elle est vide (sortie qui vient de démarrer, capteur qui vient
   /// de se connecter).
   static double? _windowedMean(RideMetricTrack track, int windowS) {
-    final points = track.recent(windowS);
+    // Sans les points pris à l'arrêt, comme la moyenne « toute la sortie ».
+    final points = [for (final p in track.recent(windowS)) if (p.moving) p];
     if (points.isEmpty) return null;
     var sum = 0.0;
     for (final point in points) {
