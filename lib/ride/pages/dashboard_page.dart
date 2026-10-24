@@ -279,13 +279,16 @@ class DashboardPage extends StatelessWidget {
     // tour choisi vit dans `LapListBody`, d'où ce relais entre lui et l'en-tête.
     if (page is LapListPageSpec) {
       return _LapSelectionScope(
-        builder: (selectedLap) => _frame(selectedLap),
+        builder: (selectedLap, pickLap) => _frame(selectedLap, pickLap),
       );
     }
-    return _frame(null);
+    return _frame(null, null);
   }
 
-  Widget _frame(ValueNotifier<RideLap?>? selectedLap) {
+  Widget _frame(
+    ValueNotifier<RideLap?>? selectedLap,
+    ValueNotifier<VoidCallback?>? pickLap,
+  ) {
     return ColoredBox(
       color: const Color(0xFF16181B),
       child: SafeArea(
@@ -295,11 +298,11 @@ class DashboardPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(selectedLap),
+              _header(selectedLap, pickLap),
               // Moins d'écart qu'avant : un titre discret n'a pas besoin d'être
               // détaché de ce qu'il nomme, et cette page ne doit pas défiler.
               const SizedBox(height: 8),
-              Expanded(child: _body(selectedLap)),
+              Expanded(child: _body(selectedLap, pickLap)),
             ],
           ),
         ),
@@ -307,7 +310,11 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _body(ValueNotifier<RideLap?>? selectedLap) => switch (page) {
+  Widget _body(
+    ValueNotifier<RideLap?>? selectedLap,
+    ValueNotifier<VoidCallback?>? pickLap,
+  ) =>
+      switch (page) {
         // La carte ne passe jamais par ici : la coquille la peint au fond de la
         // pile, et cette page-ci n'est même pas construite pour elle.
         MapPageSpec() => const SizedBox.shrink(),
@@ -326,6 +333,7 @@ class DashboardPage extends StatelessWidget {
             onGridMeasured: onGridMeasured,
             visible: visible,
             selectedLap: selectedLap,
+            pickLapRequest: pickLap,
           ),
       };
 
@@ -615,7 +623,10 @@ class DashboardPage extends StatelessWidget {
   /// un titre : on sait sur quelle page on vient de glisser, il ne fait que la
   /// nommer. Il se lit donc comme une étiquette, du même gris que les titres de
   /// cartes, et rend ses pixels à la grille.
-  Widget _header(ValueNotifier<RideLap?>? selectedLap) {
+  Widget _header(
+    ValueNotifier<RideLap?>? selectedLap,
+    ValueNotifier<VoidCallback?>? pickLap,
+  ) {
     return Row(
       children: [
         // La même icône que celle du menu ⋮ — on l'a choisie pour repérer la
@@ -623,18 +634,29 @@ class DashboardPage extends StatelessWidget {
         // avant d'y arriver. Même gris discret que le titre qu'elle précède,
         // pour la même raison : on sait déjà sur quelle page on vient de
         // glisser, elle ne fait que la nommer.
-        if (page.icon case final icon?) ...[
-          FaIcon(icon, size: 16, color: Colors.white70),
-          const SizedBox(width: 8),
-        ],
+        // Sur une page de tours, toute la zone (icône, titre, durée) ouvre le
+        // choix du tour, comme le composant sélecteur.
         Expanded(
-          child: selectedLap == null
-              ? Text(page.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: _titleStyle)
-              : _LapTitle(
-                  title: page.title,
-                  selectedLap: selectedLap,
-                  recorder: sources.recorder,
+          child: InkWell(
+            onTap: pickLap == null ? null : () => pickLap.value?.call(),
+            child: Row(
+              children: [
+                if (page.icon case final icon?) ...[
+                  FaIcon(icon, size: 16, color: Colors.white70),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: selectedLap == null
+                      ? Text(page.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: _titleStyle)
+                      : _LapTitle(
+                          title: page.title,
+                          selectedLap: selectedLap,
+                          recorder: sources.recorder,
+                        ),
                 ),
+              ],
+            ),
+          ),
         ),
         // Sur une page ouverte depuis le menu : la seule commande est d'en
         // sortir. Pas de menu d'actions par-dessus — on referme d'abord, et la
@@ -923,7 +945,10 @@ const _titleStyle = TextStyle(
 class _LapSelectionScope extends StatefulWidget {
   const _LapSelectionScope({required this.builder});
 
-  final Widget Function(ValueNotifier<RideLap?> selectedLap) builder;
+  final Widget Function(
+    ValueNotifier<RideLap?> selectedLap,
+    ValueNotifier<VoidCallback?> pickLap,
+  ) builder;
 
   @override
   State<_LapSelectionScope> createState() => _LapSelectionScopeState();
@@ -931,15 +956,17 @@ class _LapSelectionScope extends StatefulWidget {
 
 class _LapSelectionScopeState extends State<_LapSelectionScope> {
   final _selectedLap = ValueNotifier<RideLap?>(null);
+  final _pickLap = ValueNotifier<VoidCallback?>(null);
 
   @override
   void dispose() {
     _selectedLap.dispose();
+    _pickLap.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(_selectedLap);
+  Widget build(BuildContext context) => widget.builder(_selectedLap, _pickLap);
 }
 
 /// Le titre de la page suivi du chrono du tour affiché : celui du tour en

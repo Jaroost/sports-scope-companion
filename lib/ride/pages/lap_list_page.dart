@@ -50,6 +50,7 @@ class LapListBody extends StatefulWidget {
     this.onGridMeasured,
     this.visible = true,
     this.selectedLap,
+    this.pickLapRequest,
   });
 
   final LapListPageSpec spec;
@@ -70,6 +71,10 @@ class LapListBody extends StatefulWidget {
 
   /// Reçoit le tour affiché, pour que l'en-tête de la page en montre le chrono.
   final ValueNotifier<RideLap?>? selectedLap;
+
+  /// Reçoit l'action « ouvrir le choix du tour », pour que l'en-tête de la
+  /// page (zone icône, titre, durée) la déclenche d'un tap.
+  final ValueNotifier<VoidCallback?>? pickLapRequest;
 
   @override
   State<LapListBody> createState() => _LapListBodyState();
@@ -108,6 +113,7 @@ class _LapListBodyState extends State<LapListBody> {
     super.initState();
     _laps = widget.sources.recorder.lapsOf(widget.spec.series);
     widget.sources.recorder.addListener(_onRecorderChanged);
+    widget.pickLapRequest?.value = _pickCurrent;
   }
 
   @override
@@ -272,6 +278,13 @@ class _LapListBodyState extends State<LapListBody> {
         ),
       ),
     );
+  }
+
+  void _pickCurrent() {
+    if (!mounted || _laps.isEmpty) return;
+    final selected =
+        (_selectedIndex ?? _laps.length - 1).clamp(0, _laps.length - 1);
+    _pickLap(_laps, selected);
   }
 
   Future<void> _pickLap(List<RideLap> laps, int selected) async {
