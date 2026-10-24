@@ -202,7 +202,7 @@ class _RideBottomBandState extends State<RideBottomBand> {
         child: ListenableBuilder(
           listenable: widget.recorder,
           builder: (context, _) {
-            final onTap = widget.recorder.isActive ? () => widget.recorder.markLap(series) : null;
+            final onTap = widget.recorder.isActive ? () => widget.recorder.markLap(series, label: label) : null;
             final color = onTap == null ? Colors.white24 : Colors.white70;
             return Material(
               color: background ?? const Color(0xFF1F2226),

@@ -469,23 +469,13 @@ Future<void> openNavigation(
     }
   }
 
-  // `autoRecord` vient de la même modale : un choix déjà fait sur le site n'a
-  // pas à être reposé au guidon. `null` (lien plus ancien, navigation choisie
-  // dans l'appli) garde la question ; `false` la saute sans démarrer ; `true`
-  // démarre directement, comme si le cycliste avait répondu « Enregistrer ».
+  // L'enregistrement démarre toujours, sans question : une sortie enregistrée
+  // depuis le début vaut mieux qu'une sortie rattrapée en route. Seul un
+  // `autoRecord: false` explicite (choix « sans enregistrer » fait sur le site)
+  // le saute ; `null` (lien plus ancien, navigation choisie dans l'appli) démarre.
   if (!recorder.isActive) {
-    if (target.autoRecord == true) {
+    if (target.autoRecord != false) {
       await _startRecording(context, recorder, preset.sensors, preset.lapSeries);
-    } else if (target.autoRecord == null) {
-      final go = await _offerRecording(
-        context,
-        recorder,
-        preset.sensors,
-        preset.lapSeries,
-        dataSaver,
-      );
-      // « Annuler » : on ne part pas du tout, la navigation ne s'ouvre pas.
-      if (!go) return;
     }
     if (!context.mounted) return;
   }
@@ -529,99 +519,7 @@ Future<void> openNavigation(
   if (target.handoffToken != null) await onHandoffRideEnded?.call();
 }
 
-/// Propose de lancer l'enregistrement, juste avant de partir.
-///
-/// C'est le bon moment pour le demander — le cycliste a encore ses mains, et
-/// une sortie enregistrée depuis le début vaut mieux qu'une sortie rattrapée en
-/// route. Ce n'est plus la *seule* occasion pour autant : la page Effort porte
-/// un bouton de départ tant que rien n'est enregistré, parce que c'est là qu'on
-/// s'aperçoit d'avoir dit non.
-///
-/// Le démarrage n'est pas automatique : ouvrir la carte pour vérifier une route
-/// avant de partir fabriquerait une sortie de deux minutes à chaque fois, et
-/// c'est le genre de déchet qu'on finit par ne plus trier.
-///
-/// **La navigation s'ouvre dans tous les cas.** Refus, panne de GPS, position
-/// désactivée : l'enregistrement est un supplément, la navigation est le but.
-///
-/// Seule exception : « Annuler », qui renonce à partir. Rend `false` alors, et l'appelant
-/// n'ouvre rien.
-Future<bool> _offerRecording(
-  BuildContext context,
-  RideRecorder recorder,
-  SensorSettings sensors,
-  Set<String> lapSeries,
-  DataSaverStore dataSaver,
-) async {
-  // Le réglage se fait ici, au dernier moment où l'on a l'appli en main : une carte
-  // hors ligne vient d'être téléchargée pour ce trajet, et c'est maintenant qu'on coupe le
-  // réseau pour de bon. Appliqué quelle que soit la réponse sur l'enregistrement — les deux
-  // questions n'ont rien à voir —, et avant l'ouverture de la navigation, qui le lit.
-  var saveData = dataSaver.enabled;
-  final wanted = await showDialog<bool>(
-    context: context,
-    // Pas de sortie par le côté : la question mérite une réponse, et un tap à
-    // côté ne doit pas trancher à la place du cycliste.
-    barrierDismissible: false,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Enregistrer cette sortie ?'),
-      content: StatefulBuilder(
-        builder: (context, setState) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'La trace, les capteurs et le dénivelé seront écrits pendant '
-              'toute la navigation.\n\nSi tu dis non, la page Effort gardera '
-              'un bouton pour démarrer en route — mais ce qui précède ne sera '
-              'pas rattrapé.',
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Économie de données'),
-              subtitle: const Text(
-                'Plus de tuiles, POI ni météo en direct : la carte hors ligne '
-                'téléchargée prend le relais.',
-              ),
-              value: saveData,
-              onChanged: (value) => setState(() => saveData = value),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        // `null` et non `false` : renoncer à partir n'est pas répondre « sans enregistrer ».
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Annuler'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Naviguer seulement'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Enregistrer'),
-        ),
-      ],
-    ),
-  );
-
-  // Annulé : rien ne change, y compris l'économie de données.
-  if (wanted == null) return false;
-
-  await dataSaver.setEnabled(saveData);
-
-  if (wanted && context.mounted) {
-    await _startRecording(context, recorder, sensors, lapSeries);
-  }
-  return true;
-}
-
-/// Démarre l'enregistrement, et dit si ça a échoué. Séparé de [_offerRecording]
-/// pour que le choix fait sur le site (`autoRecord: true`) puisse démarrer
-/// directement, sans reposer la question que la modale du site vient de poser.
+/// Démarre l'enregistrement, et dit si ça a échoué.
 Future<void> _startRecording(
   BuildContext context,
   RideRecorder recorder,

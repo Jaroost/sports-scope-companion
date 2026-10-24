@@ -193,7 +193,7 @@ class _NotchBandState extends State<NotchBand> {
   Widget _markLap(String series, String? label, Color? background) => ListenableBuilder(
         listenable: widget.recorder,
         builder: (context, _) {
-          final onTap = widget.recorder.isActive ? () => widget.recorder.markLap(series) : null;
+          final onTap = widget.recorder.isActive ? () => widget.recorder.markLap(series, label: label) : null;
           final color = onTap == null ? Colors.white24 : Colors.white70;
           return FittedBox(
             fit: BoxFit.scaleDown,
