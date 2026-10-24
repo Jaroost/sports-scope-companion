@@ -298,18 +298,24 @@ class RideRecorder extends ChangeNotifier {
     _notify();
   }
 
-  /// Saute le bloc en cours **s'il est optionnel** : l'horloge du programme avance du temps
-  /// qu'il lui restait, si bien que le bloc suivant s'ouvre tout de suite et que tous les
-  /// jalons d'après arrivent d'autant plus tôt. `WorkoutPolicy` voit alors le jalon franchi
+  /// Ce qu'il reste au bloc sauté avant le suivant : on reste dans le bloc en cours le temps
+  /// que le son de passage (annoncé avant le début d'un bloc) puisse se jouer en entier.
+  static const int skipLeadSeconds = 20;
+
+  /// Saute le bloc en cours **s'il est optionnel** : l'horloge du programme avance jusqu'à
+  /// [skipLeadSeconds] secondes avant la fin du bloc, qu'on reste donc dans le même mode le
+  /// temps de ce compte à rebours, après quoi le bloc suivant s'ouvre et tous les jalons
+  /// d'après arrivent d'autant plus tôt. `WorkoutPolicy` voit alors le jalon franchi
   /// au tic suivant, comme s'il l'avait été naturellement (tour marqué, voix, sons).
-  /// Rend `false` quand il n'y a rien à sauter — aucun programme, ou bloc obligatoire.
+  /// Rend `false` quand il n'y a rien à sauter — aucun programme, bloc obligatoire, ou
+  /// bloc déjà dans ses dernières [skipLeadSeconds] secondes.
   bool skipWorkoutBlock() {
     final program = _activeWorkout;
     final elapsed = workoutElapsed;
     if (program == null || elapsed == null) return false;
     final skipped = program.skippableSecondsAt(elapsed);
-    if (skipped == null || skipped <= 0) return false;
-    _workoutStartSeconds = _workoutStartSeconds! - skipped;
+    if (skipped == null || skipped <= skipLeadSeconds) return false;
+    _workoutStartSeconds = _workoutStartSeconds! - (skipped - skipLeadSeconds);
     _notify();
     return true;
   }
