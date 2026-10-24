@@ -7,7 +7,9 @@ import '../../dashboard/metric_id.dart';
 import '../../dashboard/ride_preset.dart';
 import '../../network/data_saver.dart';
 import '../../training_program/training_program.dart';
+import '../../recording/ride_lap.dart';
 import '../../ui/barred_icon.dart';
+import '../../ui/formats.dart';
 import '../battery_status.dart';
 import '../blocks/altitude_profile_block.dart';
 import '../blocks/averages_block.dart';
@@ -273,6 +275,17 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Une page de tours montre le chrono du tour affiché dans son titre : le
+    // tour choisi vit dans `LapListBody`, d'où ce relais entre lui et l'en-tête.
+    if (page is LapListPageSpec) {
+      return _LapSelectionScope(
+        builder: (selectedLap) => _frame(selectedLap),
+      );
+    }
+    return _frame(null);
+  }
+
+  Widget _frame(ValueNotifier<RideLap?>? selectedLap) {
     return ColoredBox(
       color: const Color(0xFF16181B),
       child: SafeArea(
@@ -282,11 +295,11 @@ class DashboardPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(),
+              _header(selectedLap),
               // Moins d'écart qu'avant : un titre discret n'a pas besoin d'être
               // détaché de ce qu'il nomme, et cette page ne doit pas défiler.
               const SizedBox(height: 8),
-              Expanded(child: _body()),
+              Expanded(child: _body(selectedLap)),
             ],
           ),
         ),
@@ -294,7 +307,7 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _body() => switch (page) {
+  Widget _body(ValueNotifier<RideLap?>? selectedLap) => switch (page) {
         // La carte ne passe jamais par ici : la coquille la peint au fond de la
         // pile, et cette page-ci n'est même pas construite pour elle.
         MapPageSpec() => const SizedBox.shrink(),
@@ -312,6 +325,7 @@ class DashboardPage extends StatelessWidget {
             sources: sources,
             onGridMeasured: onGridMeasured,
             visible: visible,
+            selectedLap: selectedLap,
           ),
       };
 
@@ -601,7 +615,7 @@ class DashboardPage extends StatelessWidget {
   /// un titre : on sait sur quelle page on vient de glisser, il ne fait que la
   /// nommer. Il se lit donc comme une étiquette, du même gris que les titres de
   /// cartes, et rend ses pixels à la grille.
-  Widget _header() {
+  Widget _header(ValueNotifier<RideLap?>? selectedLap) {
     return Row(
       children: [
         // La même icône que celle du menu ⋮ — on l'a choisie pour repérer la
@@ -614,16 +628,13 @@ class DashboardPage extends StatelessWidget {
           const SizedBox(width: 8),
         ],
         Expanded(
-          child: Text(
-            page.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          child: selectedLap == null
+              ? Text(page.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: _titleStyle)
+              : _LapTitle(
+                  title: page.title,
+                  selectedLap: selectedLap,
+                  recorder: sources.recorder,
+                ),
         ),
         // Sur une page ouverte depuis le menu : la seule commande est d'en
         // sortir. Pas de menu d'actions par-dessus — on referme d'abord, et la
@@ -897,5 +908,72 @@ class DashboardPage extends StatelessWidget {
     if (offline.ready) return 'Prête';
     if (offline.mb > 0) return '~${offline.mb.toStringAsFixed(0)} Mo';
     return 'Pour rouler sans réseau';
+  }
+}
+
+const _titleStyle = TextStyle(
+  color: Colors.white70,
+  fontSize: 18,
+  fontWeight: FontWeight.w600,
+);
+
+/// Porte le [ValueNotifier] du tour affiché par une page de tours, pour que
+/// l'en-tête (dessiné par [DashboardPage]) suive le choix fait dans
+/// `LapListBody`.
+class _LapSelectionScope extends StatefulWidget {
+  const _LapSelectionScope({required this.builder});
+
+  final Widget Function(ValueNotifier<RideLap?> selectedLap) builder;
+
+  @override
+  State<_LapSelectionScope> createState() => _LapSelectionScopeState();
+}
+
+class _LapSelectionScopeState extends State<_LapSelectionScope> {
+  final _selectedLap = ValueNotifier<RideLap?>(null);
+
+  @override
+  void dispose() {
+    _selectedLap.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_selectedLap);
+}
+
+/// Le titre de la page suivi du chrono du tour affiché : celui du tour en
+/// cours progresse (le recorder notifie à chaque seconde), celui d'un tour
+/// clos reste figé à sa durée finale.
+class _LapTitle extends StatelessWidget {
+  const _LapTitle({
+    required this.title,
+    required this.selectedLap,
+    required this.recorder,
+  });
+
+  final String title;
+  final ValueNotifier<RideLap?> selectedLap;
+  final Listenable recorder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([selectedLap, recorder]),
+      builder: (context, _) {
+        final lap = selectedLap.value;
+        final text = lap == null
+            ? title
+            : '$title · ${formatDurationHms(Duration(seconds: lap.pointCount))}';
+        return Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _titleStyle.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        );
+      },
+    );
   }
 }

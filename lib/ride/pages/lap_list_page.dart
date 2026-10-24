@@ -49,6 +49,7 @@ class LapListBody extends StatefulWidget {
     required this.sources,
     this.onGridMeasured,
     this.visible = true,
+    this.selectedLap,
   });
 
   final LapListPageSpec spec;
@@ -66,6 +67,9 @@ class LapListBody extends StatefulWidget {
   /// uniquement à détecter le **front** « redevient visible » — voir
   /// [_LapListBodyState._selectedIndex].
   final bool visible;
+
+  /// Reçoit le tour affiché, pour que l'en-tête de la page en montre le chrono.
+  final ValueNotifier<RideLap?>? selectedLap;
 
   @override
   State<LapListBody> createState() => _LapListBodyState();
@@ -164,6 +168,7 @@ class _LapListBodyState extends State<LapListBody> {
     final laps = _laps;
 
     if (laps.isEmpty) {
+      _publishSelected(null);
       return const Center(
         child: Text(
           'Pas encore de tour.',
@@ -173,8 +178,19 @@ class _LapListBodyState extends State<LapListBody> {
     }
 
     final selected = (_selectedIndex ?? laps.length - 1).clamp(0, laps.length - 1);
+    _publishSelected(laps[selected]);
 
     return _body(laps, selected);
+  }
+
+  /// Après le build : notifier pendant celui-ci reconstruirait l'en-tête en
+  /// plein milieu de la construction de l'arbre.
+  void _publishSelected(RideLap? lap) {
+    final notifier = widget.selectedLap;
+    if (notifier == null || notifier.value == lap) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) notifier.value = lap;
+    });
   }
 
   /// Une liste défilante ([LapBlocksLayout], le cas d'avant ce chantier) ou
