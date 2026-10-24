@@ -428,10 +428,8 @@ class _LapListBodyState extends State<LapListBody> {
           textColor: climbProfile.textColor,
         ),
       // Le profil de toute la sortie, pas celui du tour affiché — comme sur
-      // une page de mesures ordinaire (`DashboardPage._block`) : rien ne le
-      // recadre sur `lap`, `AltitudeProfileCard` n'a pas de variante « Lap »
-      // (contrairement à `ClimbProfileBlock`, qui en a une parce qu'un col
-      // grimpé garde un sens propre une fois le tour clos).
+      // une page de mesures ordinaire (`DashboardPage._block`).
+      // `LapAltitudeProfileBlock`, juste au-dessus, est son pendant recadré.
       final AltitudeProfileBlock altitudeProfile => AltitudeProfileCard(
           routeProfile: widget.sources.routeProfile,
           nav: widget.sources.nav,
@@ -439,6 +437,18 @@ class _LapListBodyState extends State<LapListBody> {
           windowKm: altitudeProfile.windowKm,
           color: altitudeProfile.color,
           textColor: altitudeProfile.textColor,
+        ),
+      // Le pendant recadré : le profil du tour affiché, D+ et distance du tour.
+      final LapAltitudeProfileBlock lapAltitudeProfile => LapAltitudeProfileCard(
+          lap: lap,
+          recorder: widget.sources.recorder,
+          // Le tracé n'a de sens que sur le tour qui s'écrit encore : un tour
+          // clos garde son propre profil, figé.
+          routeProfile: isCurrentLap ? widget.sources.routeProfile : null,
+          nav: isCurrentLap ? widget.sources.nav : null,
+          windowKm: lapAltitudeProfile.windowKm,
+          color: lapAltitudeProfile.color,
+          textColor: lapAltitudeProfile.textColor,
         ),
       // La tendance de toute la sortie, jamais recadrée sur `lap` — même
       // remarque que `AltitudeProfileBlock` juste au-dessus. `LapMetricTrendBlock`,

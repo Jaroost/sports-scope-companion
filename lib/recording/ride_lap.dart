@@ -1,3 +1,4 @@
+import 'ride_elevation_track.dart';
 import 'ride_metric_track.dart';
 import 'ride_stats.dart';
 
@@ -23,6 +24,13 @@ import 'ride_stats.dart';
 /// secondes ». Alimentées avec la seconde *depuis l'ouverture du tour*
 /// ([pointCount] avant incrément), pas celle de la sortie : `RideMetricTrack`
 /// ne lit ses points que par position relative, l'origine ne compte pas.
+///
+/// [elevationTrack] est le profil (distance, altitude) du tour pour
+/// `LapAltitudeProfileBlock` : distances **rebasées à 0** à l'ouverture du
+/// tour (`point.distanceM - startDistanceM`), parce que
+/// `ElevationProfileGraph` met à l'échelle sur `points.last.distM` — un
+/// premier point resté à la distance cumulée de la sortie ne remplirait
+/// qu'une fraction de la largeur.
 class RideLap {
   RideLap({
     required this.index,
@@ -31,13 +39,15 @@ class RideLap {
     this.label,
   })  : stats = RideStats(),
         heartRateTrack = RideMetricTrack(),
-        powerTrack = RideMetricTrack();
+        powerTrack = RideMetricTrack(),
+        elevationTrack = RideElevationTrack();
 
   final int index;
   final DateTime startedAt;
   final RideStats stats;
   final RideMetricTrack heartRateTrack;
   final RideMetricTrack powerTrack;
+  final RideElevationTrack elevationTrack;
 
   /// Distance cumulée depuis le départ de la sortie, au moment où ce tour
   /// s'ouvre — le repère que [distanceM] retranche.

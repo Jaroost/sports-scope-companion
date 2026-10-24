@@ -665,6 +665,14 @@ class RideRecorder extends ChangeNotifier {
       // entière — voir la doc de `RideLap.heartRateTrack`/`powerTrack`.
       lap.heartRateTrack.add(lap.pointCount, point.heartRate);
       lap.powerTrack.add(lap.pointCount, point.power);
+      // Même altitude résolue que pour [elevationTrack] ci-dessus, distance
+      // rebasée sur l'ouverture du tour — voir la doc de `RideLap`.
+      if (altitude != null) {
+        lap.elevationTrack.add(
+          (point.distanceM - lap.startDistanceM).clamp(0.0, double.infinity),
+          altitude,
+        );
+      }
       lap.pointCount++;
     }
 

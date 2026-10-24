@@ -150,6 +150,7 @@ sealed class DashboardBlock {
       'altitude_profile' => AltitudeProfileBlock.parse(raw),
       'metric_trend' => MetricTrendBlock.parse(raw),
       'lap_metric_trend' => LapMetricTrendBlock.parse(raw),
+      'lap_altitude_profile' => LapAltitudeProfileBlock.parse(raw),
       'clock' => ClockBlock.parse(raw),
       'workout_segment' => WorkoutSegmentBlock(
           upcoming: raw['upcoming'] == true,
@@ -2460,6 +2461,41 @@ class AltitudeProfileBlock extends DashboardBlock {
   @override
   bool operator ==(Object other) =>
       other is AltitudeProfileBlock &&
+      other.windowKm == windowKm &&
+      other.color == color &&
+      other.textColor == textColor;
+
+  @override
+  int get hashCode => Object.hash(windowKm, color, textColor);
+}
+
+/// Le profil d'altitude du tour affiché, en graphique — pendant de
+/// [AltitudeProfileBlock] borné au tour sélectionné d'une page Tours, comme
+/// [LapMetricTrendBlock] l'est de [MetricTrendBlock]. Une classe à part parce
+/// qu'elle n'a de sens que sur une page qui porte un tour ; en-tête : le D+ et
+/// la distance **du tour**. Un seul mode, le graphique remplit la case ; pas de
+/// fenêtre roulante sur un tour clos. Voir `LapAltitudeProfileCard`.
+class LapAltitudeProfileBlock extends DashboardBlock {
+  const LapAltitudeProfileBlock({this.windowKm, super.color, super.textColor});
+
+  /// Seulement pour le tour **en cours** pendant un suivi de tracé : le tour
+  /// déjà fait puis les [windowKm] prochains kilomètres du tracé (`window_km`).
+  /// `null` : tout le reste du tracé. Sans effet sur un tour clos ou sans
+  /// tracé — même convention que [AltitudeProfileBlock.windowKm].
+  final double? windowKm;
+
+  static LapAltitudeProfileBlock parse(Map<dynamic, dynamic> raw) {
+    final rawWindow = _toDouble(raw['window_km']);
+    return LapAltitudeProfileBlock(
+      windowKm: rawWindow != null && rawWindow > 0 ? rawWindow : null,
+      color: DashboardBlock._colorOf(raw, 'color'),
+      textColor: DashboardBlock._colorOf(raw, 'text_color'),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is LapAltitudeProfileBlock &&
       other.windowKm == windowKm &&
       other.color == color &&
       other.textColor == textColor;

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../recording/elevation_profile_point.dart';
+import '../../recording/ride_lap.dart';
 import '../../recording/ride_recorder.dart';
 import '../../ui/formats.dart';
 import '../nav_state.dart';
@@ -252,5 +253,126 @@ class AltitudeProfileCard extends StatelessWidget {
   static double _gradeNear(List<double> segmentGrades, int cursorIdx) {
     if (segmentGrades.isEmpty) return 0;
     return segmentGrades[cursorIdx.clamp(0, segmentGrades.length - 1)];
+  }
+}
+
+/// Le profil d'altitude du **tour affiché** — voir `LapAltitudeProfileBlock`.
+/// Deux allures, comme [AltitudeProfileCard] :
+///
+/// - **tour en cours pendant un suivi de tracé** ([routeProfile]/[nav]
+///   fournis par l'appelant, donc seulement pour le dernier tour) : le profil
+///   du *tracé* découpé du départ du tour jusqu'à la fin du tracé — ou jusqu'à
+///   [windowKm] km devant la position —, la portion déjà roulée du tour en
+///   gris. Le départ du tour sur le tracé est estimé en retranchant
+///   `lap.distanceM` à la position courante sur le tracé : un détour hors
+///   tracé pendant le tour le décale d'autant, sans conséquence pour un
+///   graphique de case ;
+/// - sinon (tour clos, pas de tracé, hors tracé) : la piste propre du tour,
+///   `RideLap.elevationTrack`, sans « restant ».
+///
+/// Dans les deux cas l'en-tête donne le D+ et la distance **du tour**
+/// (`RideLap.stats`/`distanceM`), jamais ceux du tracé.
+///
+/// Écoute [recorder] : la piste d'un tour ouvert grossit à chaque tic sans que
+/// [lap] change d'identité.
+class LapAltitudeProfileCard extends StatelessWidget {
+  const LapAltitudeProfileCard({
+    super.key,
+    required this.lap,
+    required this.recorder,
+    this.routeProfile,
+    this.nav,
+    this.windowKm,
+    this.color,
+    this.textColor,
+  });
+
+  final RideLap lap;
+  final RideRecorder recorder;
+  final ValueListenable<RouteProfile?>? routeProfile;
+  final ValueListenable<NavState?>? nav;
+
+  /// `null` : tout le reste du tracé — voir `LapAltitudeProfileBlock.windowKm`.
+  final double? windowKm;
+
+  final Color? color;
+  final Color? textColor;
+
+  static const _title = "Profil d'altitude (tour)";
+
+  @override
+  Widget build(BuildContext context) {
+    final routeProfile = this.routeProfile;
+    final nav = this.nav;
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        recorder,
+        if (routeProfile != null) routeProfile,
+        if (nav != null) nav,
+      ]),
+      builder: (context, _) => _build(routeProfile?.value, nav?.value),
+    );
+  }
+
+  Widget _build(RouteProfile? profile, NavState? navState) {
+    final headline = '+${lap.stats.ascentM.round()} m';
+    final aside = formatDistance(lap.distanceM);
+
+    if (navState != null && navState.onRoute && profile != null && profile.isUsable) {
+      final ratio = AltitudeProfileCard._traveledRatio(profile, navState);
+      if (ratio != null) {
+        final traveledM = ratio * profile.totalDistM;
+        final startM = math.max(0.0, traveledM - lap.distanceM);
+        final window = windowKm;
+        final endM = window == null
+            ? profile.totalDistM
+            : math.min(traveledM + window * 1000, profile.totalDistM);
+        final sliced = AltitudeProfileCard._sliceProfile(
+          profile.points,
+          profile.segmentGrades,
+          startM,
+          endM,
+        );
+        if (sliced.points.length >= 2 && endM > startM) {
+          return ElevationProfileSurface(
+            title: _title,
+            headline: headline,
+            aside: aside,
+            grade: AltitudeProfileCard._gradeNear(
+              profile.segmentGrades,
+              AltitudeProfileCard._cursorIndex(profile.points, traveledM),
+            ),
+            points: sliced.points,
+            segmentGrades: sliced.grades,
+            ratio: ((traveledM - startM) / (endM - startM)).clamp(0.0, 1.0),
+            dark: true,
+            color: color,
+            textColor: textColor,
+          );
+        }
+      }
+    }
+
+    final points = lap.elevationTrack.points;
+    if (points.length < 2) {
+      return BlockCard(
+        title: _title,
+        lines: const ['En attente de position…'],
+        color: color,
+        textColor: textColor,
+      );
+    }
+    return ElevationProfileSurface(
+      title: _title,
+      headline: headline,
+      aside: aside,
+      grade: lap.stats.gradePercent ?? 0,
+      points: points,
+      segmentGrades: localGradesOf(points),
+      ratio: null,
+      dark: true,
+      color: color,
+      textColor: textColor,
+    );
   }
 }
