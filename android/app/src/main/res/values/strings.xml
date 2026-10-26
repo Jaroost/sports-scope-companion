@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_key_service_description">Lit les touches lecture/pause de la télécommande Bluetooth pendant une sortie, pour que l’appui long serve à l’appli au lieu d’ouvrir l’assistant. Rien d’autre n’est lu : ni écran, ni texte saisi.</string>
+</resources>

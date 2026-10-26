@@ -1941,6 +1941,11 @@ class _RideShellPageState extends State<RideShellPage>
   }
 
   void _onRemoteKey(RemoteKeyEvent event) {
+    // La sonde du banc d'essai (`activity`) passe par le même flux que la
+    // session : une ligne par appui *et* par relâchement, y compris pour les
+    // boutons du téléphone. Prise pour une touche, elle doublait chaque geste
+    // (mesuré : 2 clics pour une pression du téléphone, 3 pour la télécommande).
+    if (event.source == 'activity') return;
     final key = RemoteKey.ofNative(event.key);
     if (key == null) return;
     if (key.isVolume) {

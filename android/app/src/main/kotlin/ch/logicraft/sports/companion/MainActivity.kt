@@ -1,11 +1,26 @@
 package ch.logicraft.sports.companion
 
+import android.view.KeyEvent
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+
+    private var remoteKeys: RemoteKeys? = null
+
+    /**
+     * Laisse la sonde de la télécommande voir chaque touche avant son routage
+     * (voir [RemoteKeys.probe]), puis rend au téléphone ses propres boutons de
+     * volume (voir [RemoteKeys.interceptPhoneVolume]) : tout le reste suit son
+     * chemin normal.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        remoteKeys?.probe(event)
+        if (remoteKeys?.interceptPhoneVolume(event) == true) return true
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -16,7 +31,7 @@ class MainActivity : FlutterActivity() {
 
         // Banc d'essai de la télécommande : la session média ne s'active qu'au
         // premier abonné, côté Dart.
-        RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        remoteKeys = RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SCREEN_CHANNEL)
             .setMethodCallHandler { call, result ->

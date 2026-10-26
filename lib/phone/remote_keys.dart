@@ -47,11 +47,15 @@ class RemoteKeyEvent {
     this.action,
     this.repeat,
     this.time,
+    this.device,
   });
 
-  /// `media` (session média : lecture, suivant…), `volume` (sens d'une
-  /// pression, via le fournisseur de volume) ou `flutter` (touche arrivée par
-  /// la fenêtre, appli au premier plan).
+  /// `accessibility` (lecture/pause vue par le service d'accessibilité, avant
+  /// l'assistant : la seule voie qui livre l'appui long), `media` (session
+  /// média : lecture, suivant…), `volume` (sens d'une
+  /// pression, via le fournisseur de volume) ou `activity` (touche vue par la
+  /// fenêtre avant son routage, appli au premier plan — la seule à dire de quel
+  /// appareil elle vient).
   final String source;
   final String key;
 
@@ -59,6 +63,10 @@ class RemoteKeyEvent {
   final String? action;
   final int? repeat;
   final DateTime? time;
+
+  /// L'appareil d'origine, en toutes lettres (voir `RemoteKeys.deviceOf`). Pour
+  /// le banc d'essai seulement : rien n'en dépend encore.
+  final String? device;
 
   /// Tolérant : un événement incompréhensible rend `null` plutôt que de lever,
   /// même convention que les décodeurs GATT.
@@ -73,6 +81,7 @@ class RemoteKeyEvent {
       key: key,
       action: raw['action'] as String?,
       repeat: (raw['repeat'] as num?)?.toInt(),
+      device: raw['device'] as String?,
       time: millis is num
           ? DateTime.fromMillisecondsSinceEpoch(millis.toInt())
           : null,
@@ -81,7 +90,13 @@ class RemoteKeyEvent {
 
   @override
   String toString() {
-    final parts = [source, key, ?action, if (repeat != null && repeat! > 0) 'x$repeat'];
+    final parts = [
+      source,
+      key,
+      ?action,
+      if (repeat != null && repeat! > 0) 'x$repeat',
+      ?device,
+    ];
     return parts.join(' · ');
   }
 }
@@ -109,6 +124,28 @@ class AndroidRemoteKeys {
       });
     } catch (e) {
       debugPrint('[télécommande] réglage non transmis : $e');
+    }
+  }
+
+  /// Le service d'accessibilité (`RemoteKeyService.kt`) est-il activé ? C'est lui
+  /// qui permet l'appui long sur lecture/pause : sans lui Android l'envoie à
+  /// l'assistant et l'appli ne voit que le clic. `false` en cas d'erreur.
+  Future<bool> accessibilityEnabled() async {
+    try {
+      return await _control.invokeMethod<bool>('accessibilityEnabled') ?? false;
+    } catch (e) {
+      debugPrint('[télécommande] état du service illisible : $e');
+      return false;
+    }
+  }
+
+  /// Ouvre les réglages d'accessibilité, où l'on active le service à la main —
+  /// Android n'offre aucun moyen de le faire à la place de l'utilisateur.
+  Future<void> openAccessibilitySettings() async {
+    try {
+      await _control.invokeMethod<void>('openAccessibilitySettings');
+    } catch (e) {
+      debugPrint('[télécommande] réglages non ouverts : $e');
     }
   }
 

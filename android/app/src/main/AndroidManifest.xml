@@ -96,6 +96,21 @@
                     android:pathPattern="/routes/.*/navigate"/>
             </intent-filter>
         </activity>
+        <!-- Touches lecture/pause de la télécommande, vues avant l'assistant
+             (RemoteKeyService.kt). À activer une fois dans Réglages →
+             Accessibilité ; inerte hors sortie. -->
+        <service
+            android:name=".RemoteKeyService"
+            android:exported="true"
+            android:label="Sports Scope — télécommande"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/remote_key_service"/>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

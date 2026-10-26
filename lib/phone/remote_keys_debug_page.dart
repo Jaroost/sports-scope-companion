@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'debug_log.dart';
 import 'remote_keys.dart';
@@ -9,12 +8,17 @@ import 'remote_keys.dart';
 /// Banc d'essai de la télécommande Bluetooth : affiche chaque touche reçue, et
 /// par quel chemin elle est arrivée. Temporaire, comme `GattSniffPage`.
 ///
-/// Trois chemins, qu'on veut distinguer avant de choisir lequel garder :
+/// Quatre chemins, qu'on veut distinguer avant de choisir lequel garder :
+/// - `accessibility` : lecture/pause vue par le service d'accessibilité, avant
+///   l'assistant — la seule voie qui livre l'appui long (sans lui, Gemini
+///   s'ouvre) ; consommée là, la touche n'arrive plus par `media` ;
 /// - `media` : la session média native (marche écran éteint) ;
-/// - `volume` : le sens des pressions, via le fournisseur de volume ;
-/// - `flutter` : la touche telle que la fenêtre la reçoit (appli au premier
-///   plan seulement). Si une touche paraît ici **et** en `media`, c'est que la
-///   session ne la consomme pas à elle seule.
+/// - `volume` : le sens des pressions, via le fournisseur de volume — sans
+///   appareil d'origine ;
+/// - `activity` : la touche vue par la fenêtre avant son routage (appli au
+///   premier plan, écran allumé seulement), avec **l'appareil qui l'a émise**.
+///   C'est la sonde : appuyer sur le volume de la télécommande puis sur celui du
+///   téléphone, et comparer les `id`/« nom » des deux lignes.
 ///
 /// L'écran n'est **pas** maintenu allumé, contrairement à `GattSniffPage` : le
 /// cas à vérifier est justement écran verrouillé. Chaque touche est donc aussi
@@ -27,33 +31,36 @@ class RemoteKeysDebugPage extends StatefulWidget {
   State<RemoteKeysDebugPage> createState() => _RemoteKeysDebugPageState();
 }
 
-class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage> {
+class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage>
+    with WidgetsBindingObserver {
   final _entries = <String>[];
   StreamSubscription<RemoteKeyEvent>? _sub;
+  bool? _accessibility;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _sub = const AndroidRemoteKeys().events().listen(_record);
-    HardwareKeyboard.instance.addHandler(_onKey);
+    unawaited(_refreshAccessibility());
+  }
+
+  Future<void> _refreshAccessibility() async {
+    final enabled = await const AndroidRemoteKeys().accessibilityEnabled();
+    if (mounted) setState(() => _accessibility = enabled);
+  }
+
+  // On revient des réglages d'accessibilité : relire l'état du service.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refreshAccessibility());
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_onKey);
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_sub?.cancel());
     super.dispose();
-  }
-
-  bool _onKey(KeyEvent event) {
-    if (event is KeyRepeatEvent) return false;
-    _record(RemoteKeyEvent(
-      source: 'flutter',
-      key: event.logicalKey.debugName ?? event.logicalKey.keyLabel,
-      action: event is KeyDownEvent ? 'down' : 'up',
-    ));
-    // Jamais consommée : le banc observe, il ne vole rien.
-    return false;
   }
 
   void _record(RemoteKeyEvent event) {
@@ -90,6 +97,21 @@ class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
+          if (_accessibility == false)
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.accessibility_new),
+              title: const Text('Appui long sur lecture/pause'),
+              subtitle: const Text(
+                  'Service d’accessibilité désactivé : l’appui long ouvre '
+                  'l’assistant. Active « Sports Scope — télécommande ».'),
+              trailing: TextButton(
+                onPressed: () async {
+                  await const AndroidRemoteKeys().openAccessibilitySettings();
+                },
+                child: const Text('Réglages'),
+              ),
+            ),
           Expanded(
             child: _entries.isEmpty
                 ? const Center(child: Text('En attente d’une touche…'))

@@ -606,6 +606,20 @@ Quatre choses à ne pas défaire, **mesurées sur le téléphone** :
   en a une. Le volume n'a pas de relâchement : une impulsion vaut un clic, et
   l'éditeur ne lui propose que celui-là (le serveur écarte les autres).
 
+- **L'appui long sur lecture/pause ouvre l'assistant, pas l'appli.** Android traite
+  cette touche comme une « touche vocale » : il attend lui-même le délai d'appui
+  long et, s'il est atteint, lance Gemini sans rien livrer à la `MediaSession`
+  (relâchée avant, elle n'arrive que comme un clic). Seul un **service
+  d'accessibilité** (`RemoteKeyService.kt`, `flagRequestFilterKeyEvents`) passe
+  devant : il reçoit appui, répétitions et relâchement, et en les consommant il
+  retire la touche à l'assistant. Il est **inerte hors sortie** (`listener` posé
+  par `RemoteKeys.start`, retiré par `stop`) et ne touche qu'aux touches
+  lecture/pause **de la télécommande** (`isRemoteDevice`). Se consommant, la
+  touche n'arrive plus par la session : un seul chemin (`source: accessibility`),
+  pas de doublon. Android interdit d'activer un tel service par code : une fois,
+  à la main, Réglages → Accessibilité (la page de debug le signale et ouvre les
+  réglages). Sans lui, lecture/pause marche comme avant, appui long exclu.
+
 `Debug → Télécommande` (`RemoteKeysDebugPage`) montre ce que la télécommande
 envoie vraiment, par chemin d'arrivée — à ouvrir avant de soupçonner le matériel.
 
