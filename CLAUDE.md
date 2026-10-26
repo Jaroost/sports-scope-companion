@@ -571,6 +571,44 @@ l'éditeur n'a donc pas encore de clé, et n'apparaît dans « Aller à… » qu
 un premier « Enregistrer » — l'éditeur le dit en toutes lettres plutôt que de
 laisser deviner pourquoi la page manque à l'appel.
 
+### La télécommande Bluetooth (volume, suivant, précédent, lecture)
+
+Une deuxième source de boutons, qui rejoint les mêmes actions : une télécommande
+média est vue par Android comme un clavier HID/AVRCP, **jamais comme un capteur
+GATT** — `flutter_blue_plus` ne la voit pas. Ses touches se captent par une
+`MediaSession` (`android/…/RemoteKeys.kt`, flux `lib/phone/remote_keys.dart`),
+et se règlent sur le site à côté des canaux du D-Fly : `buttons.remote_volume_up`,
+`remote_volume_down`, `remote_next`, `remote_previous`, `remote_play_pause`, même
+structure de gestes (`ButtonSettings.remote`, `CompanionSettings::REMOTE_KEYS`).
+
+Quatre choses à ne pas défaire, **mesurées sur le téléphone** :
+
+- **La session doit jouer du son pour de vrai.** Déclarée « en lecture » sans
+  rien jouer, elle ne reçoit que le volume : suivant/précédent/pause allaient au
+  lecteur de musique. D'où un `AudioTrack` de silence en boucle, **sans focus
+  audio** — la musique continue.
+- **Une musique qui démarre après nous reprend la priorité.** `AudioManager`
+  prévient de chaque changement de lecture du téléphone : la session repasse alors
+  par « pause » puis « lecture » (`reclaim`, avec un délai pour ne pas se
+  déclencher elle-même). Redire « lecture » à une session déjà en lecture ne
+  réordonne rien.
+- **Absent vaut rien, contrairement aux canaux 1 et 2.** La coquille ne prend la
+  session que si le profil assigne au moins une touche (`hasRemote`) : la prendre
+  pour rien couperait la télécommande à la musique. En contrepartie, **une fois
+  prise, lecture/suivant/précédent ne pilotent plus la musique** pendant la sortie
+  (ces touches sont consommées, y compris sans action). Le volume, lui, est
+  rendu au système pour toute touche sans action (`configure` →
+  `adjustStreamVolume`).
+- **Les gestes se déduisent des délais** (`RemoteKeyGesturePolicy`, pure) : une
+  touche HID n'est qu'un appui et un relâchement, le matériel ne classe rien.
+  On n'attend que ce qu'on pourrait perdre : un clic ne patiente 300 ms que si le
+  double-clic a une action, un appui ne devient long (600 ms) que si l'appui long
+  en a une. Le volume n'a pas de relâchement : une impulsion vaut un clic, et
+  l'éditeur ne lui propose que celui-là (le serveur écarte les autres).
+
+`Debug → Télécommande` (`RemoteKeysDebugPage`) montre ce que la télécommande
+envoie vraiment, par chemin d'arrivée — à ouvrir avant de soupçonner le matériel.
+
 ## Le tableau de bord de sortie (`lib/ride/`)
 
 `RideShellPage` est la coquille : plein écran, rétroéclairage, zones obstruées

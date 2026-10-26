@@ -21,6 +21,7 @@ import '../navigation/route_catalog_store.dart';
 import '../navigation/screen_dimmer.dart';
 import '../network/data_saver.dart';
 import '../phone/phone_sensors.dart';
+import '../phone/remote_keys.dart';
 import '../phone/rider_compass.dart';
 import '../recording/ride_recorder.dart';
 import '../training_program/training_program.dart';
@@ -39,6 +40,7 @@ import 'climb_edge_policy.dart';
 import 'climb_debug_data.dart';
 import 'climb_profile.dart';
 import 'di2_button_gesture_policy.dart';
+import 'remote_key_gesture_policy.dart';
 import 'native_turn_alerts.dart';
 import 'nav_state.dart';
 import 'nearby_pois.dart';
@@ -572,6 +574,16 @@ class _RideShellPageState extends State<RideShellPage>
   Timer? _buttonTick;
   final _buttonGestures = Di2ButtonGesturePolicy();
 
+  /// La télécommande Bluetooth (volume, suivant, précédent, lecture) : ses
+  /// touches viennent de la session média native (`RemoteKeys.kt`), qui n'existe
+  /// **que si le profil assigne au moins une touche** — la prendre sans rien en
+  /// faire couperait la télécommande à la musique pour rien. Même chemin
+  /// d'exécution que le D-Fly ([_performButtonAction]).
+  StreamSubscription<RemoteKeyEvent>? _remoteKeySub;
+  Timer? _remoteKeyTick;
+  late final _remoteKeyGestures =
+      RemoteKeyGesturePolicy(actionsOf: _preset.buttons.remoteActions);
+
   /// Tic dédié à la boussole, plus rapide que celui d'une seconde. Il rafraîchit
   /// la pastille et, **quand le cap est forcé** (pastille verrouillée), pousse
   /// le cap à la page : la carte du site doit alors tourner en direct sous le
@@ -839,6 +851,22 @@ class _RideShellPageState extends State<RideShellPage>
       _buttonTick = Timer.periodic(const Duration(milliseconds: 200), (_) {
         for (final event in _buttonGestures.resolve(DateTime.now())) {
           _dispatchButtonGesture(event.channel, event.gesture);
+        }
+      });
+    }
+
+    if (_preset.buttons.hasRemote) {
+      const remote = AndroidRemoteKeys();
+      // Une touche de volume sans action reste au système : le réglage part
+      // avant l'abonnement, qui est ce qui prend la session média.
+      unawaited(remote.configure(
+        captureVolumeUp: _preset.buttons.remoteActions(RemoteKey.volumeUp).click != null,
+        captureVolumeDown: _preset.buttons.remoteActions(RemoteKey.volumeDown).click != null,
+      ));
+      _remoteKeySub = remote.events().listen(_onRemoteKey);
+      _remoteKeyTick = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        for (final event in _remoteKeyGestures.resolve(DateTime.now())) {
+          _dispatchRemoteGesture(event.key, event.gesture);
         }
       });
     }
@@ -1912,6 +1940,38 @@ class _RideShellPageState extends State<RideShellPage>
     if (action != null) _performButtonAction(action);
   }
 
+  void _onRemoteKey(RemoteKeyEvent event) {
+    final key = RemoteKey.ofNative(event.key);
+    if (key == null) return;
+    if (key.isVolume) {
+      // Une impulsion par pression, sans relâchement : un clic tout de suite.
+      // Le natif ne la livre que si la touche est assignée (`configure`).
+      _dispatchRemoteGesture(key, RemoteGesture.click);
+      return;
+    }
+    // Les répétitions du système sur une touche maintenue ne sont pas des
+    // appuis : la politique les absorberait, autant ne pas les lui donner.
+    if ((event.repeat ?? 0) > 0) return;
+    if (event.action == null) return;
+    if (_remoteKeyGestures.onKey(key, down: event.action == 'down', at: DateTime.now())
+        case final gesture?) {
+      _dispatchRemoteGesture(gesture.key, gesture.gesture);
+    }
+  }
+
+  /// Le pendant de [_dispatchButtonGesture] pour la télécommande : le profil dit
+  /// quelle action, rien si la touche n'en a pas pour ce geste.
+  void _dispatchRemoteGesture(RemoteKey key, RemoteGesture gesture) {
+    debugPrint('[boutons] télécommande $key geste $gesture');
+    final actions = _preset.buttons.remoteActions(key);
+    final action = switch (gesture) {
+      RemoteGesture.click => actions.click,
+      RemoteGesture.doubleClick => actions.doubleClick,
+      RemoteGesture.longPress => actions.longPress,
+    };
+    if (action != null) _performButtonAction(action);
+  }
+
   void _performButtonAction(ButtonAction action) {
     switch (action) {
       case NextPageAction():
@@ -2144,8 +2204,12 @@ class _RideShellPageState extends State<RideShellPage>
     widget.dataSaver.removeListener(_onDataSaverChanged);
     _tick?.cancel();
     _buttonTick?.cancel();
+    _remoteKeyTick?.cancel();
     _compassTick?.cancel();
     unawaited(_remoteButtonSub?.cancel());
+    // Annuler l'abonnement libère la session média : la télécommande retrouve
+    // la musique dès qu'on rentre.
+    unawaited(_remoteKeySub?.cancel());
     _buttonBell.dispose();
     // Le magnétomètre s'éteint avec la sortie : c'est le seul capteur de ce
     // dossier qui coûterait de la batterie une fois l'écran refermé.

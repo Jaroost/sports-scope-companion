@@ -31,6 +31,7 @@ import 'navigation/route_catalog_store.dart';
 import 'network/data_saver.dart';
 import 'phone/debug_log_page.dart';
 import 'phone/phone_sensors.dart';
+import 'phone/remote_keys_debug_page.dart';
 import 'phone/rider_compass.dart';
 import 'ride/climb_debug_page.dart';
 import 'ride/radar_debug_page.dart';
@@ -768,6 +769,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
   /// dérive de la boussole — voir `phone/debug_log_page.dart`. Utile en
   /// particulier loin de tout `adb` : le journal reste lisible sur le
   /// téléphone, et se copie pour être renvoyé une fois rentré.
+  /// Banc d'essai temporaire : ce que la télécommande Bluetooth envoie
+  /// vraiment, avant de lui donner un rôle — voir `phone/remote_keys_debug_page.dart`.
+  void _openRemoteKeys() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const RemoteKeysDebugPage(),
+    ));
+  }
+
   void _openDebugLog() {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => const DebugLogPage(),
@@ -1045,6 +1054,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
                 child: const ListTile(
                   leading: Icon(Icons.bug_report),
                   title: Text('Sniff GATT (D-Fly)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _openRemoteKeys,
+                child: const ListTile(
+                  leading: Icon(Icons.settings_remote),
+                  title: Text('Télécommande'),
                 ),
               ),
               PopupMenuItem(

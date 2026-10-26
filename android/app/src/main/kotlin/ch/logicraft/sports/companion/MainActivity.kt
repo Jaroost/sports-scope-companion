@@ -14,6 +14,10 @@ class MainActivity : FlutterActivity() {
         // ne démarre qu'au premier abonné, côté Dart.
         PhoneSensors(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
+        // Banc d'essai de la télécommande : la session média ne s'active qu'au
+        // premier abonné, côté Dart.
+        RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SCREEN_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {

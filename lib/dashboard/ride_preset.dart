@@ -5,6 +5,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../ble/sensor_profile.dart';
 import '../lighting/auto_lighting.dart';
 import '../navigation/screen_dimmer.dart';
+import '../phone/remote_keys.dart' show RemoteKey;
 import 'companion_icons.dart';
 import 'dashboard_block.dart';
 import 'grid_layout.dart';
@@ -1904,6 +1905,8 @@ class ButtonGestureActions {
   final ButtonAction? doubleClick;
   final ButtonAction? longPress;
 
+  bool get hasAny => click != null || doubleClick != null || longPress != null;
+
   static ButtonGestureActions parse(Object? raw) {
     if (raw is! Map) return const ButtonGestureActions();
     return ButtonGestureActions(
@@ -1930,12 +1933,26 @@ class ButtonSettings {
     this.channel2 = const ButtonGestureActions(click: NextPageAction()),
     this.channel3 = const ButtonGestureActions(),
     this.channel4 = const ButtonGestureActions(),
+    this.remote = const {},
   });
 
   final ButtonGestureActions channel1;
   final ButtonGestureActions channel2;
   final ButtonGestureActions channel3;
   final ButtonGestureActions channel4;
+
+  /// Les touches de la télécommande Bluetooth (`RemoteKey`), même structure de
+  /// gestes que les canaux du D-Fly. **Absent vaut rien** — contrairement aux
+  /// canaux 1 et 2 : tant qu'aucune touche n'est assignée, l'appli ne prend pas
+  /// la session média, et la télécommande continue de piloter la musique.
+  final Map<RemoteKey, ButtonGestureActions> remote;
+
+  ButtonGestureActions remoteActions(RemoteKey key) =>
+      remote[key] ?? const ButtonGestureActions();
+
+  /// Vrai dès qu'une touche a une action : c'est ce qui décide si la coquille
+  /// prend la session média (et donc les touches) pour toute la sortie.
+  bool get hasRemote => remote.values.any((actions) => actions.hasAny);
 
   static ButtonSettings parse(Object? raw) {
     if (raw is! Map) return const ButtonSettings();
@@ -1949,6 +1966,11 @@ class ButtonSettings {
       channel2: channel('channel2', fallback.channel2),
       channel3: channel('channel3', fallback.channel3),
       channel4: channel('channel4', fallback.channel4),
+      remote: {
+        for (final key in RemoteKey.values)
+          if (raw.containsKey(key.settingsKey))
+            key: ButtonGestureActions.parse(raw[key.settingsKey]),
+      },
     );
   }
 }
