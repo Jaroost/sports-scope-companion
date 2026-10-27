@@ -2,6 +2,7 @@ package ch.logicraft.sports.companion
 
 import android.view.KeyEvent
 import android.view.WindowManager
+import android.webkit.CookieManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -33,6 +34,16 @@ class MainActivity : FlutterActivity() {
         // premier abonné, côté Dart.
         remoteKeys = RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, COOKIES_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "flush") {
+                    flushCookies()
+                    result.success(null)
+                } else {
+                    result.notImplemented()
+                }
+            }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SCREEN_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -47,6 +58,16 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /**
+     * Android n'écrit les cookies du WebView sur disque qu'avec retard : un
+     * processus tué juste après la connexion (`flutter run`, appli balayée)
+     * perd le cookie de session alors que `site_session.json`, lui, est déjà
+     * écrit — l'icône du profil dit « connecté » devant une navigation anonyme.
+     */
+    private fun flushCookies() {
+        CookieManager.getInstance().flush()
     }
 
     /**
@@ -88,7 +109,13 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onPause() {
+        flushCookies()
+        super.onPause()
+    }
+
     companion object {
+        private const val COOKIES_CHANNEL = "sports_scope/cookies"
         private const val SCREEN_CHANNEL = "sports_scope/screen"
     }
 }

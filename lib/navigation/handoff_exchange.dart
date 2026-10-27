@@ -89,6 +89,12 @@ class HandoffExchange {
       timeout,
       onTimeout: () {
         debugPrint('[handoff] pas de réponse en ${timeout.inSeconds} s');
+        // Référence voulue : le minuteur du `timeout` est ce qui garde le
+        // contrôleur en vie pendant le chargement. Sans lui, plus rien ne le
+        // retient une fois `loadRequest` rendu, le ramasse-miettes détruit le
+        // WebView natif et la page ne finit jamais (mesuré : 12 s de silence,
+        // jeton jamais échangé, session anonyme).
+        controller.loadRequest(Uri.parse('about:blank'));
         return false;
       },
     );

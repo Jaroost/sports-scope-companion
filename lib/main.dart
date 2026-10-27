@@ -22,6 +22,7 @@ import 'devices/gatt_sniff_page.dart';
 import 'devices/known_devices_store.dart';
 import 'devices/sensor_status_strip.dart';
 import 'devices/sensors_page.dart';
+import 'account/cookie_flush.dart';
 import 'navigation/handoff_exchange.dart';
 import 'navigation/screen_dimmer.dart';
 import 'navigation/navigation_picker_sheet.dart';
@@ -230,11 +231,26 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
   /// réglages n'ont pas pu être relus » n'est pas une information à poser sur
   /// l'écran d'avant-départ. Le statut, lui, est gardé (voir [_settingsStatus])
   /// — c'est [_openLink] qui décide s'il vaut la peine de réessayer.
-  Future<void> _refreshSettings() async {
-    _settingsStatus = await refreshCompanionSettings(
+  Future<SettingsFetchStatus> _refreshSettings() async {
+    final status = await refreshCompanionSettings(
       widget.settings,
       trainingBudget: widget.trainingBudget,
     );
+    _settingsStatus = status;
+    // Le 401 propre du site est la seule preuve fiable de la session dans le
+    // pot de cookies : sans cette écriture, une session ouverte par un lien
+    // entrant (jeton échangé hors écran) laissait l'accueil sur « non connecté »,
+    // seul l'écran Compte écrivant `site_session.json`.
+    switch (status) {
+      case SettingsFetchStatus.ok:
+        await widget.session.record(true);
+        await flushWebViewCookies();
+      case SettingsFetchStatus.signedOut:
+        await widget.session.record(false);
+      default:
+        break;
+    }
+    return status;
   }
 
   /// « Ouvrir dans l'appli » depuis le site, ou un lien d'itinéraire partagé.
@@ -277,9 +293,16 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
       // écran, l'un après l'autre) : sans rien à l'écran, ça se lit comme une
       // appli qui ne répond plus, alors qu'elle télécharge.
       final exchanged = await _withConnectingDialog(() async {
-        final ok = await const HandoffExchange().run(handoffToken);
-        if (ok) await _refreshSettings();
-        return ok;
+        // Le résultat de l'échange n'est pas lu : `onPageFinished` n'atteste
+        // pas que le jeton a été accepté (un jeton refusé finit aussi sur
+        // `/robots.txt`, en anonyme), et à l'inverse un délai dépassé
+        // (mesuré : « pas de réponse en 12 s ») n'empêche pas le serveur
+        // d'avoir déjà consommé ce jeton à usage unique. Le rendre à la
+        // navigation le ferait rejouer, refusé, par-dessus une session déjà
+        // posée — donc une carte anonyme, au mauvais fond. Seule une réponse
+        // authentifiée tranche.
+        await const HandoffExchange().run(handoffToken);
+        return await _refreshSettings() == SettingsFetchStatus.ok;
       });
       if (exchanged) target = target.withoutHandoffToken();
     }

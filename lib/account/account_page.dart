@@ -4,6 +4,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../navigation/navigation_target.dart';
+import 'cookie_flush.dart';
 import 'site_session.dart';
 
 /// L'écran de connexion au site — le site lui-même, dans un WebView.
@@ -83,6 +84,9 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _check() async {
     final signedIn = await probeSignedIn(_controller);
     await widget.session.record(signedIn);
+    // Dès la connexion aboutie, pas plus tard : c'est le moment où le cookie
+    // est neuf, donc celui qu'un processus tué perdrait.
+    if (signedIn == true) await flushWebViewCookies();
     if (!mounted) return;
 
     if (_watcher.read(signedIn)) {
