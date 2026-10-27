@@ -199,8 +199,19 @@ class MetricView extends StatelessWidget {
     // le point courant entre dans la piste de cette mesure. Rien tant que le
     // graphique n'est pas réglé sur cette case : la plupart des mesures n'ont
     // alors jamais de piste à tenir à jour.
-    if (chartWindowS != null && reading.numericValue != null) {
-      sources.recorder.trackFor(metric).add(sources.recorder.recorded.inSeconds, reading.numericValue);
+    // Sur une page Tours, la piste est celle du tour affiché (secondes depuis
+    // son ouverture) et un tour clos n'en reçoit plus : sa valeur « de
+    // maintenant » n'a rien à voir avec lui.
+    final lap = sources.lap;
+    final track = chartWindowS == null
+        ? null
+        : (lap != null ? lap.trackFor(metric) : sources.recorder.trackFor(metric));
+    if (track != null && reading.numericValue != null) {
+      if (lap == null) {
+        track.add(sources.recorder.recorded.inSeconds, reading.numericValue);
+      } else if (sources.recorder.isOpenLap(lap)) {
+        track.add(lap.pointCount, reading.numericValue);
+      }
     }
 
     // Le step en cours du programme d'entraînement, s'il y en a un — la
@@ -297,9 +308,7 @@ class MetricView extends StatelessWidget {
           backgroundChart: chartWindowS == null
               ? null
               : BackgroundChartGraph(
-                  points: chartWindowS == 0
-                      ? sources.recorder.trackFor(metric).points
-                      : sources.recorder.trackFor(metric).recent(chartWindowS),
+                  points: chartWindowS == 0 ? track!.points : track!.recent(chartWindowS),
                   areaColor: chartAreaColor,
                   colorForValue: valueColorOf,
                   lineColor: backgroundChartLineColor,

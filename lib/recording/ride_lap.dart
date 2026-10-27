@@ -49,6 +49,15 @@ class RideLap {
   final RideMetricTrack powerTrack;
   final RideElevationTrack elevationTrack;
 
+  final Map<Object, RideMetricTrack> _metricTracks = {};
+
+  /// La piste d'une mesure quelconque pour le graphique de fond d'une case
+  /// posée sur une page Tours : comme `RideRecorder.trackFor`, mais propre au
+  /// tour (secondes depuis son ouverture). Sans elle, la case lisait la piste
+  /// de la sortie entière et le graphique du tour montrait tout le trajet.
+  RideMetricTrack trackFor(Object metric) =>
+      _metricTracks.putIfAbsent(metric, RideMetricTrack.new);
+
   /// Distance cumulée depuis le départ de la sortie, au moment où ce tour
   /// s'ouvre — le repère que [distanceM] retranche.
   final double startDistanceM;

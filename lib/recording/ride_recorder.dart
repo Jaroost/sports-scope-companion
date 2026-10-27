@@ -234,6 +234,10 @@ class RideRecorder extends ChangeNotifier {
   /// précède, qu'on veut pourtant pouvoir lire (« avant la première côte »).
   final Map<String, List<RideLap>> _series = {};
 
+  /// Vrai si [lap] est le tour courant d'une série : seul celui-là reçoit
+  /// encore des mesures, un tour clos garde sa piste telle qu'elle était.
+  bool isOpenLap(RideLap lap) => _series.values.any((laps) => laps.isNotEmpty && laps.last == lap);
+
   /// Les tours de [series], du premier au tour courant (le dernier de la
   /// liste, toujours ouvert). Vide si la série n'a pas été déclarée au départ
   /// ou si rien n'est enregistré.
