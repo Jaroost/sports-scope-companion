@@ -36,6 +36,13 @@ class LapStarted {
   final String series;
   final String? label;
   final int index;
+
+  /// Ce tour porte-t-il [name] ? Par son étiquette (case du bandeau, étape
+  /// d'entraînement) **ou** par sa série : un bouton Di2 ou de télécommande ne
+  /// saisit que `start_lap:<série>` sur le site, jamais d'étiquette, si bien
+  /// qu'une comparaison sur l'étiquette seule ne pouvait jamais se vérifier
+  /// pour un tour lancé par un bouton.
+  bool isNamed(String name) => label == name || series == name;
 }
 
 /// Enregistre une sortie : GPS et capteurs réunis, une ligne par seconde.

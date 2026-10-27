@@ -1424,7 +1424,7 @@ class _RideShellPageState extends State<RideShellPage>
         PageMenuCondition.nearCol => _nearCol(),
         PageMenuCondition.workoutActive => widget.recorder.activeWorkout != null,
         PageMenuCondition.lapNamed => page.menuConditionLapName != null &&
-            widget.recorder.lapStarted.value?.label == page.menuConditionLapName,
+            widget.recorder.lapStarted.value?.isNamed(page.menuConditionLapName!) == true,
       };
 
   /// Entrée sous −3 %, sortie au-dessus de −1 % : la bande morte évite un
