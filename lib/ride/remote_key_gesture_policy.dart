@@ -22,8 +22,8 @@ class RemoteKeyGestureEvent {
 /// celui-ci en a une, sinon il vaut un clic quelle que soit sa durée — un doigt
 /// un peu lent ne doit pas rendre la touche sourde.
 ///
-/// Le volume n'a pas de relâchement, il ne passe pas ici : une impulsion y vaut
-/// un clic, tout de suite (`RemoteKey.isVolume`).
+/// Le volume n'a pas de relâchement, il ne passe pas ici : voir
+/// `RemoteVolumePulsePolicy`.
 class RemoteKeyGesturePolicy {
   RemoteKeyGesturePolicy({
     required this.actionsOf,

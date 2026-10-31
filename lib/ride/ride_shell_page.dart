@@ -41,6 +41,7 @@ import 'climb_debug_data.dart';
 import 'climb_profile.dart';
 import 'di2_button_gesture_policy.dart';
 import 'remote_key_gesture_policy.dart';
+import 'remote_volume_pulse_policy.dart';
 import 'native_turn_alerts.dart';
 import 'nav_state.dart';
 import 'nearby_pois.dart';
@@ -583,6 +584,8 @@ class _RideShellPageState extends State<RideShellPage>
   Timer? _remoteKeyTick;
   late final _remoteKeyGestures =
       RemoteKeyGesturePolicy(actionsOf: _preset.buttons.remoteActions);
+  late final _remoteVolumeGestures =
+      RemoteVolumePulsePolicy(actionsOf: _preset.buttons.remoteActions);
 
   /// Tic dédié à la boussole, plus rapide que celui d'une seconde. Il rafraîchit
   /// la pastille et, **quand le cap est forcé** (pastille verrouillée), pousse
@@ -860,12 +863,16 @@ class _RideShellPageState extends State<RideShellPage>
       // Une touche de volume sans action reste au système : le réglage part
       // avant l'abonnement, qui est ce qui prend la session média.
       unawaited(remote.configure(
-        captureVolumeUp: _preset.buttons.remoteActions(RemoteKey.volumeUp).click != null,
-        captureVolumeDown: _preset.buttons.remoteActions(RemoteKey.volumeDown).click != null,
+        captureVolumeUp: _preset.buttons.remoteActions(RemoteKey.volumeUp).hasAny,
+        captureVolumeDown: _preset.buttons.remoteActions(RemoteKey.volumeDown).hasAny,
       ));
       _remoteKeySub = remote.events().listen(_onRemoteKey);
       _remoteKeyTick = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        for (final event in _remoteKeyGestures.resolve(DateTime.now())) {
+        final now = DateTime.now();
+        for (final event in [
+          ..._remoteKeyGestures.resolve(now),
+          ..._remoteVolumeGestures.resolve(now),
+        ]) {
           _dispatchRemoteGesture(event.key, event.gesture);
         }
       });
@@ -1949,9 +1956,12 @@ class _RideShellPageState extends State<RideShellPage>
     final key = RemoteKey.ofNative(event.key);
     if (key == null) return;
     if (key.isVolume) {
-      // Une impulsion par pression, sans relâchement : un clic tout de suite.
-      // Le natif ne la livre que si la touche est assignée (`configure`).
-      _dispatchRemoteGesture(key, RemoteGesture.click);
+      // Une impulsion par pression, sans relâchement : le geste se déduit de
+      // leur rythme. Le natif ne la livre que si la touche est assignée
+      // (`configure`).
+      if (_remoteVolumeGestures.onPulse(key, at: DateTime.now()) case final gesture?) {
+        _dispatchRemoteGesture(gesture.key, gesture.gesture);
+      }
       return;
     }
     // Les répétitions du système sur une touche maintenue ne sont pas des

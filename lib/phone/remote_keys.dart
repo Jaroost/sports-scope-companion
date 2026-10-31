@@ -20,8 +20,9 @@ enum RemoteKey {
 
   String get settingsKey => 'remote_$token';
 
-  /// Le volume ne livre qu'une impulsion par pression, sans relâchement : il
-  /// ne peut donc produire que le clic (voir `RemoteKeyGesturePolicy`).
+  /// Le volume ne livre qu'une impulsion par pression, sans relâchement : ses
+  /// gestes se déduisent du rythme des impulsions, pas d'un appui et d'un
+  /// relâchement (voir `RemoteVolumePulsePolicy`).
   bool get isVolume => this == volumeUp || this == volumeDown;
 
   /// `null` pour une touche que ce banc ne connaît pas — jamais une erreur.
