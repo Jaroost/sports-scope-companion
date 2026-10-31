@@ -1044,6 +1044,8 @@ sealed class BandSlot {
     if (raw == 'next_button_set') return const BandActionSlot(BandAction.nextButtonSet);
     final mapCommand = MapCommand.parse(raw);
     if (mapCommand != null) return BandMapSlot(mapCommand);
+    final mediaCommand = MediaCommand.parse(raw);
+    if (mediaCommand != null) return BandMediaSlot(mediaCommand);
     if (raw is String && raw.startsWith('bell_')) {
       return BandBellSlot(_bellSoundOf(raw.substring('bell_'.length)));
     }
@@ -1121,6 +1123,7 @@ sealed class BandSlot {
           BandWorkoutSlot(mode, upcoming: upcoming, color: color),
         BandBellSlot(:final sound) => BandBellSlot(sound, color: color),
         BandMapSlot(:final command) => BandMapSlot(command, color: color),
+        BandMediaSlot(:final command) => BandMediaSlot(command, color: color),
         BandMarkLapSlot(:final series, :final label) =>
           BandMarkLapSlot(series: series, label: label, color: color),
       };
@@ -1305,6 +1308,36 @@ enum MapCommand {
     }
     return null;
   }
+}
+
+/// Une commande du lecteur de musique d'Android : volume, piste, lecture/pause.
+/// Partagée entre les cases de bandeau/encoche ([BandMediaSlot]) et les boutons
+/// physiques ([MediaCommandAction]) — mêmes jetons que
+/// `CompanionSettings::MEDIA_COMMANDS`. Exécutée par `MediaControl`
+/// (`lib/phone/media_control.dart`).
+enum MediaCommand {
+  volumeUp('media_volume_up', 'Vol +'),
+  volumeDown('media_volume_down', 'Vol −'),
+  next('media_next', 'Suivant'),
+  previous('media_previous', 'Précédent'),
+  playPause('media_play_pause', 'Lecture');
+
+  const MediaCommand(this.token, this.label);
+  final String token;
+  final String label;
+
+  /// `null` sur un jeton inconnu, comme [MapCommand.parse].
+  static MediaCommand? parse(Object? raw) {
+    for (final command in values) {
+      if (command.token == raw) return command;
+    }
+    return null;
+  }
+}
+
+class BandMediaSlot extends BandSlot {
+  const BandMediaSlot(this.command, {super.color});
+  final MediaCommand command;
 }
 
 class BandMapSlot extends BandSlot {
@@ -1886,6 +1919,8 @@ sealed class ButtonAction {
     }
     final mapCommand = MapCommand.parse(raw);
     if (mapCommand != null) return MapCommandAction(mapCommand);
+    final mediaCommand = MediaCommand.parse(raw);
+    if (mediaCommand != null) return MediaCommandAction(mediaCommand);
     return switch (raw) {
       'next_page' => const NextPageAction(),
       'previous_page' => const PreviousPageAction(),
@@ -1905,6 +1940,12 @@ sealed class ButtonAction {
 class MapCommandAction extends ButtonAction {
   const MapCommandAction(this.command);
   final MapCommand command;
+}
+
+/// Une commande du lecteur de musique, exécutée par `MediaControl`.
+class MediaCommandAction extends ButtonAction {
+  const MediaCommandAction(this.command);
+  final MediaCommand command;
 }
 
 class NextPageAction extends ButtonAction {

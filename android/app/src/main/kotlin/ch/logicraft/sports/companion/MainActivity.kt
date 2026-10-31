@@ -44,6 +44,8 @@ class MainActivity : FlutterActivity() {
         remoteKeys?.dispose()
         remoteKeys = RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
+        MediaControl(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, COOKIES_CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "flush") {

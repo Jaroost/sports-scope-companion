@@ -10,6 +10,7 @@ import '../blocks/bell_block.dart';
 import '../blocks/button_set_block.dart';
 import '../blocks/leave_ride_block.dart';
 import '../blocks/map_command_block.dart';
+import '../blocks/media_command_block.dart';
 import '../blocks/radar_block.dart';
 import '../blocks/route_block.dart';
 import '../blocks/sleep_block.dart';
@@ -201,6 +202,7 @@ class _RideBottomBandState extends State<RideBottomBand> {
         _metric(metric, index, color, gaugeThresholds, gaugeThresholdColors),
       BandActionSlot(:final action, :final color) => _action(action, color),
       BandMapSlot(:final command, :final color) => _map(command, color),
+      BandMediaSlot(:final command, :final color) => _media(command, color),
       BandBellSlot(:final sound, :final color) => _bell(sound, color),
       BandRadarSlot(:final mode, :final color) => _radar(mode, color),
       BandWorkoutSlot(:final mode, :final upcoming, :final color) =>
@@ -257,6 +259,11 @@ class _RideBottomBandState extends State<RideBottomBand> {
   Widget _map(MapCommand command, Color? color) => Padding(
         padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
         child: MapCommandControl(command: command, onCommand: widget.onMapCommand, color: color),
+      );
+
+  Widget _media(MediaCommand command, Color? color) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
+        child: MediaCommandControl(command: command, color: color),
       );
 
   Widget _action(BandAction action, Color? color) => switch (action) {

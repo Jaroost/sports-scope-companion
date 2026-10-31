@@ -17,6 +17,7 @@ import '../dashboard/ride_preset.dart';
 import '../devices/known_devices_store.dart';
 import '../navigation/navigation_picker_sheet.dart';
 import '../navigation/navigation_target.dart';
+import '../phone/media_control.dart';
 import '../navigation/route_catalog_store.dart';
 import '../navigation/screen_dimmer.dart';
 import '../network/data_saver.dart';
@@ -2065,6 +2066,8 @@ class _RideShellPageState extends State<RideShellPage>
         _goToPageByKey(pageKey);
       case MapCommandAction(:final command):
         _mapCommand(command);
+      case MediaCommandAction(:final command):
+        unawaited(MediaControl.run(command));
       case TogglePauseAction():
         // Même garde que `StartLapAction` : hors enregistrement, rien à
         // suspendre ou reprendre.

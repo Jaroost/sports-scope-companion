@@ -230,6 +230,9 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
         created.setCallback(object : MediaSession.Callback() {
             override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
                 val event = keyEventOf(mediaButtonIntent) ?: return false
+                // Écho d'une commande `media_*` de l'appli (repli sans accès aux
+                // notifications) : consommé sans émettre, sinon elle se rejouerait.
+                if (SystemClock.elapsedRealtime() - MediaControl.lastKeyDispatchMs < ECHO_MS) return true
                 emit(
                     mapOf(
                         "source" to "media",
@@ -520,6 +523,7 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
         private const val VERIFY_DELAY_MS = 400L
         private const val PERIODIC_RECLAIM_MS = 2000L
         private const val SELF_CALLBACK_MS = 300L
+        private const val ECHO_MS = 500L
         private val RECLAIM_DELAYS_MS = longArrayOf(400L, 1500L)
 
         /**
