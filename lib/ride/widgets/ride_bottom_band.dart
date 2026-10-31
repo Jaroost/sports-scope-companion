@@ -7,6 +7,7 @@ import '../../dashboard/metric_id.dart';
 import '../../dashboard/ride_preset.dart';
 import '../../recording/ride_recorder.dart';
 import '../blocks/bell_block.dart';
+import '../blocks/button_set_block.dart';
 import '../blocks/leave_ride_block.dart';
 import '../blocks/map_command_block.dart';
 import '../blocks/radar_block.dart';
@@ -57,6 +58,8 @@ class RideBottomBand extends StatefulWidget {
     this.onCalibratePower,
     this.onSleep,
     this.onMapCommand,
+    this.currentButtonSet,
+    this.onNextButtonSet,
     this.onChooseWorkout,
     this.onLeaveRide,
     this.onChooseRoute,
@@ -87,6 +90,12 @@ class RideBottomBand extends StatefulWidget {
   /// Un pas sur la carte (zoom, déplacement, recentrage) — voir
   /// [MapCommandControl]. Nul sur un profil sans carte, comme [onSleep].
   final void Function(MapCommand command)? onMapCommand;
+
+  /// Le set de commandes en cours et le passage au suivant, pour la case
+  /// `next_button_set` — voir [ButtonSetControl]. [onNextButtonSet] est nul
+  /// avec un seul set ; sans [currentButtonSet], la case reste vide.
+  final ValueListenable<ButtonSet>? currentButtonSet;
+  final VoidCallback? onNextButtonSet;
 
   /// Calibrer le capteur de puissance, sur un tap des watts ou de leur zone.
   ///
@@ -285,6 +294,16 @@ class _RideBottomBandState extends State<RideBottomBand> {
         BandAction.togglePause => Padding(
             padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
             child: TogglePauseControl(recorder: widget.recorder, compact: true, color: color),
+          ),
+        BandAction.nextButtonSet => Padding(
+            padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
+            child: widget.currentButtonSet == null
+                ? const SizedBox.shrink()
+                : ButtonSetControl(
+                    current: widget.currentButtonSet!,
+                    onNext: widget.onNextButtonSet,
+                    color: color,
+                  ),
           ),
       };
 

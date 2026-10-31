@@ -67,6 +67,7 @@ import 'widgets/battery_alert_page.dart';
 import 'widgets/climb_badge.dart';
 import 'widgets/compass_badge.dart';
 import 'widgets/climb_profile_overlay.dart';
+import 'widgets/button_set_toast.dart';
 import 'widgets/lap_started_toast.dart';
 import 'widgets/map_edge_handle.dart';
 import 'widgets/map_swipe_zone.dart';
@@ -583,9 +584,9 @@ class _RideShellPageState extends State<RideShellPage>
   StreamSubscription<RemoteKeyEvent>? _remoteKeySub;
   Timer? _remoteKeyTick;
   late final _remoteKeyGestures =
-      RemoteKeyGesturePolicy(actionsOf: _preset.buttons.remoteActions);
+      RemoteKeyGesturePolicy(actionsOf: (key) => _activeButtons.remoteActions(key));
   late final _remoteVolumeGestures =
-      RemoteVolumePulsePolicy(actionsOf: _preset.buttons.remoteActions);
+      RemoteVolumePulsePolicy(actionsOf: (key) => _activeButtons.remoteActions(key));
 
   /// Tic dédié à la boussole, plus rapide que celui d'une seconde. Il rafraîchit
   /// la pastille et, **quand le cap est forcé** (pastille verrouillée), pousse
@@ -740,6 +741,21 @@ class _RideShellPageState extends State<RideShellPage>
 
   Timer? _lapToastTimer;
 
+  /// Le set de commandes en cours (voir [ButtonSet]) : c'est lui qui dit ce
+  /// que les touches Di2 et de la télécommande déclenchent. Remis au premier à
+  /// chaque sortie — rien n'est persisté. Un `ValueNotifier` parce que les
+  /// cases de bandeau/encoche (`ButtonSetControl`) en dessinent l'icône.
+  late final _currentButtonSet =
+      ValueNotifier<ButtonSet>(_preset.effectiveButtonSets.first);
+
+  /// Le set à annoncer, `null` = pas de toast — même patron que [_lapToast].
+  final _buttonSetToast = ValueNotifier<ButtonSet?>(null);
+  static const _buttonSetToastDuration = Duration(seconds: 2);
+  Timer? _buttonSetToastTimer;
+
+  /// Les touches du set en cours.
+  ButtonSettings get _activeButtons => _currentButtonSet.value.buttons;
+
   late final MetricSources _sources;
 
   /// Le W′ balance de la sortie — un modèle à état, alimenté par le capteur de
@@ -858,13 +874,18 @@ class _RideShellPageState extends State<RideShellPage>
       });
     }
 
-    if (_preset.buttons.hasRemote) {
+    // Sur l'ensemble des sets et non sur celui en cours : la session média
+    // (donc la prise des touches) dure toute la sortie, alors qu'on change de
+    // set en roulant — une touche assignée seulement dans le second set doit
+    // déjà être captée quand on est dans le premier.
+    final allButtons = _preset.effectiveButtonSets.map((set) => set.buttons);
+    if (allButtons.any((buttons) => buttons.hasRemote)) {
       const remote = AndroidRemoteKeys();
       // Une touche de volume sans action reste au système : le réglage part
       // avant l'abonnement, qui est ce qui prend la session média.
       unawaited(remote.configure(
-        captureVolumeUp: _preset.buttons.remoteActions(RemoteKey.volumeUp).hasAny,
-        captureVolumeDown: _preset.buttons.remoteActions(RemoteKey.volumeDown).hasAny,
+        captureVolumeUp: allButtons.any((b) => b.remoteActions(RemoteKey.volumeUp).hasAny),
+        captureVolumeDown: allButtons.any((b) => b.remoteActions(RemoteKey.volumeDown).hasAny),
       ));
       _remoteKeySub = remote.events().listen(_onRemoteKey);
       _remoteKeyTick = Timer.periodic(const Duration(milliseconds: 100), (_) {
@@ -1934,10 +1955,10 @@ class _RideShellPageState extends State<RideShellPage>
       _buttonFlash = ButtonGestureFlash(channel, gesture, _buttonFlashSeq++);
     });
     final actions = switch (channel) {
-      Di2ButtonChannel.one => _preset.buttons.channel1,
-      Di2ButtonChannel.two => _preset.buttons.channel2,
-      Di2ButtonChannel.three => _preset.buttons.channel3,
-      Di2ButtonChannel.four => _preset.buttons.channel4,
+      Di2ButtonChannel.one => _activeButtons.channel1,
+      Di2ButtonChannel.two => _activeButtons.channel2,
+      Di2ButtonChannel.three => _activeButtons.channel3,
+      Di2ButtonChannel.four => _activeButtons.channel4,
     };
     final action = switch (gesture) {
       Di2ButtonGesture.click => actions.click,
@@ -1978,7 +1999,7 @@ class _RideShellPageState extends State<RideShellPage>
   /// quelle action, rien si la touche n'en a pas pour ce geste.
   void _dispatchRemoteGesture(RemoteKey key, RemoteGesture gesture) {
     debugPrint('[boutons] télécommande $key geste $gesture');
-    final actions = _preset.buttons.remoteActions(key);
+    final actions = _activeButtons.remoteActions(key);
     final action = switch (gesture) {
       RemoteGesture.click => actions.click,
       RemoteGesture.doubleClick => actions.doubleClick,
@@ -1994,8 +2015,26 @@ class _RideShellPageState extends State<RideShellPage>
     unawaited(_web?.runMapCommand(command));
   }
 
+  /// Passe au set de commandes suivant, en boucle, et l'annonce. Sans effet (et
+  /// sans toast) avec un seul set : il n'y a rien à changer.
+  void _nextButtonSet() {
+    final sets = _preset.effectiveButtonSets;
+    if (sets.length < 2) return;
+    final index = sets.indexWhere((set) => set.key == _currentButtonSet.value.key);
+    final next = sets[(index + 1) % sets.length];
+    _currentButtonSet.value = next;
+    _buttonSetToastTimer?.cancel();
+    _buttonSetToast.value = next;
+    _buttonSetToastTimer = Timer(_buttonSetToastDuration, () {
+      if (!mounted) return;
+      _buttonSetToast.value = null;
+    });
+  }
+
   void _performButtonAction(ButtonAction action) {
     switch (action) {
+      case NextButtonSetAction():
+        _nextButtonSet();
       case NextPageAction():
         _stepPage(1);
       case PreviousPageAction():
@@ -2242,6 +2281,9 @@ class _RideShellPageState extends State<RideShellPage>
     widget.recorder.lapStarted.removeListener(_onLapStarted);
     _lapToastTimer?.cancel();
     _lapToast.dispose();
+    _buttonSetToastTimer?.cancel();
+    _buttonSetToast.dispose();
+    _currentButtonSet.dispose();
     _radar.removeListener(_onRadar);
     _radar.dispose();
     _mutedRadar.dispose();
@@ -2478,6 +2520,8 @@ class _RideShellPageState extends State<RideShellPage>
                 // plus bas).
                 onSleep: _preset.hasMap ? _sleep : null,
                 onMapCommand: _preset.hasMap ? _mapCommand : null,
+                currentButtonSet: _currentButtonSet,
+                onNextButtonSet: _preset.effectiveButtonSets.length > 1 ? _nextButtonSet : null,
                 // Sans rapport avec la carte, même raison que
                 // `DashboardPage.onStartWorkout` plus bas : un programme se
                 // démarre aussi bien sur home-trainer.
@@ -2543,6 +2587,8 @@ class _RideShellPageState extends State<RideShellPage>
                 radar: _preset.sensors.radar ? _radar : null,
                 onSleep: _preset.hasMap ? _sleep : null,
                 onMapCommand: _preset.hasMap ? _mapCommand : null,
+                currentButtonSet: _currentButtonSet,
+                onNextButtonSet: _preset.effectiveButtonSets.length > 1 ? _nextButtonSet : null,
                 onChooseWorkout: _chooseWorkout,
                 onLeaveRide: _leaveRide,
                 onChooseRoute: _preset.hasMap ? _chooseRoute : null,
@@ -2841,6 +2887,15 @@ class _RideShellPageState extends State<RideShellPage>
                 builder: (context, label, _) => label == null
                     ? const SizedBox.shrink()
                     : LapStartedToast(label: label),
+              ),
+            ),
+            // L'annonce du set de commandes sélectionné — voir _nextButtonSet.
+            Positioned.fill(
+              key: const ValueKey('toast-set-commandes'),
+              child: ValueListenableBuilder<ButtonSet?>(
+                valueListenable: _buttonSetToast,
+                builder: (context, set, _) =>
+                    set == null ? const SizedBox.shrink() : ButtonSetToast(set: set),
               ),
             ),
           ],

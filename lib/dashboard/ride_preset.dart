@@ -43,6 +43,7 @@ class RidePreset {
     this.screen = const ScreenSettings(),
     this.traveledPath = const TraveledPathSettings(),
     this.buttons = const ButtonSettings(),
+    this.buttonSets = const [],
     this.reminders = const [],
   });
 
@@ -146,6 +147,18 @@ class RidePreset {
   /// `Di2ButtonGesturePolicy` (`lib/ride/`) pour la classification du geste,
   /// et `RideShellPage._performButtonAction` pour l'exécution.
   final ButtonSettings buttons;
+
+  /// Les sets de commandes, dans l'ordre de rotation de `next_button_set`.
+  /// Vide pour un profil qui n'en a pas (site plus ancien, ou jamais réglé) :
+  /// [buttons] forme alors l'unique jeu, voir [effectiveButtonSets].
+  final List<ButtonSet> buttonSets;
+
+  /// Les jeux de touches parmi lesquels `next_button_set` tourne : les sets du
+  /// profil, ou un seul set implicite portant [buttons]. Jamais vide — la
+  /// coquille indexe dedans sans garde.
+  List<ButtonSet> get effectiveButtonSets => buttonSets.isEmpty
+      ? [ButtonSet(key: 'default', name: '', buttons: buttons)]
+      : buttonSets;
 
   /// Les rappels périodiques — boire, manger, entamer une intervalle — voir
   /// `RideReminderPolicy` (`lib/ride/reminder_policy.dart`) pour le
@@ -305,6 +318,7 @@ class RidePreset {
       screen: ScreenSettings.parse(raw['screen']),
       traveledPath: TraveledPathSettings.parse(raw['traveled_path']),
       buttons: ButtonSettings.parse(raw['buttons']),
+      buttonSets: _buttonSets(raw['button_sets']),
       reminders: _reminders(raw['reminders']),
     );
   }
@@ -353,6 +367,16 @@ class RidePreset {
   /// Au plus [ReminderSpec.maxCount] : le site borne déjà, mais l'appli
   /// applique ses propres garanties en silence, sur la route, comme partout
   /// ailleurs dans ce document — voir l'entête de [parse].
+  static List<ButtonSet> _buttonSets(Object? raw) {
+    if (raw is! List) return const [];
+    final sets = <ButtonSet>[];
+    for (final entry in raw) {
+      if (sets.length == ButtonSet.maxCount) break;
+      if (ButtonSet.parse(entry, sets.length) case final set?) sets.add(set);
+    }
+    return sets;
+  }
+
   static List<ReminderSpec> _reminders(Object? raw) {
     if (raw is! List) return const [];
     final reminders = <ReminderSpec>[];
@@ -1017,6 +1041,7 @@ sealed class BandSlot {
     if (raw == 'leave_ride') return const BandActionSlot(BandAction.leaveRide);
     if (raw == 'route') return const BandActionSlot(BandAction.route);
     if (raw == 'toggle_pause') return const BandActionSlot(BandAction.togglePause);
+    if (raw == 'next_button_set') return const BandActionSlot(BandAction.nextButtonSet);
     final mapCommand = MapCommand.parse(raw);
     if (mapCommand != null) return BandMapSlot(mapCommand);
     if (raw is String && raw.startsWith('bell_')) {
@@ -1251,7 +1276,7 @@ class BandMetricSlot extends BandSlot {
 /// seul lequel des deux gestes il pose. Pas de bouton d'arrêt à côté : une
 /// case de bandeau/encoche n'est pas l'endroit pour clore la sortie, on
 /// termine au retour depuis l'écran des capteurs.
-enum BandAction { sleep, toggleWorkout, leaveRide, route, togglePause }
+enum BandAction { sleep, toggleWorkout, leaveRide, route, togglePause, nextButtonSet }
 
 /// Un pas sur la carte : zoom, déplacement ou recentrage. Partagé entre les
 /// cases de bandeau/encoche ([BandMapSlot]) et les boutons physiques
@@ -1869,6 +1894,7 @@ sealed class ButtonAction {
       'wake' => const ExitSleepAction(),
       'toggle_sleep' => const ToggleSleepAction(),
       'toggle_pause' => const TogglePauseAction(),
+      'next_button_set' => const NextButtonSetAction(),
       _ => null,
     };
   }
@@ -1931,6 +1957,12 @@ class ToggleSleepAction extends ButtonAction {
 /// n'est pas un geste de route, il se fait depuis l'écran des capteurs.
 class TogglePauseAction extends ButtonAction {
   const TogglePauseAction();
+}
+
+/// Passe au set de commandes suivant (voir [ButtonSet]), en boucle. Résolu dans
+/// `RideShellPage`, qui porte le set en cours ; sans effet avec un seul set.
+class NextButtonSetAction extends ButtonAction {
+  const NextButtonSetAction();
 }
 
 /// Anticipation : ne se résout que si une page du profil porte ce
@@ -2017,6 +2049,52 @@ class ButtonSettings {
           if (raw.containsKey(key.settingsKey))
             key: ButtonGestureActions.parse(raw[key.settingsKey]),
       },
+    );
+  }
+}
+
+/// Un set de commandes : un jeu complet de réactions aux touches ([buttons])
+/// avec un nom, une icône et une couleur. Le site (`button_sets`) en range
+/// jusqu'à [maxCount], dans l'ordre de rotation de `next_button_set`.
+///
+/// [icon] est une clé de `companionIcons` (`companion_icons.dart`), [color] le
+/// `#rrggbb` du site — l'un et l'autre facultatifs, la case de bandeau et le
+/// toast retombent sur leurs défauts.
+@immutable
+class ButtonSet {
+  const ButtonSet({
+    required this.key,
+    required this.name,
+    this.icon,
+    this.color,
+    this.buttons = const ButtonSettings(),
+  });
+
+  /// Même borne que `CompanionSettings::MAX_BUTTON_SETS`.
+  static const maxCount = 6;
+
+  final String key;
+  final String name;
+  final String? icon;
+  final Color? color;
+  final ButtonSettings buttons;
+
+  static final _hex = RegExp(r'^#([0-9a-fA-F]{6})$');
+
+  /// `null` sur une entrée qui n'est pas un objet. Un nom vide retombe sur
+  /// « Set N » (rang dans le document), comme le fait le site.
+  static ButtonSet? parse(Object? raw, int index) {
+    if (raw is! Map) return null;
+    final name = raw['name'];
+    final key = raw['key'];
+    final color = raw['color'];
+    final match = color is String ? _hex.firstMatch(color) : null;
+    return ButtonSet(
+      key: key is String && key.isNotEmpty ? key : 'set-${index + 1}',
+      name: name is String && name.trim().isNotEmpty ? name.trim() : 'Set ${index + 1}',
+      icon: raw['icon'] is String ? raw['icon'] as String : null,
+      color: match == null ? null : Color(0xFF000000 | int.parse(match.group(1)!, radix: 16)),
+      buttons: ButtonSettings.parse(raw['buttons']),
     );
   }
 }

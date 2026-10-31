@@ -10,6 +10,7 @@ import '../../dashboard/metric_id.dart';
 import '../../dashboard/ride_preset.dart';
 import '../../recording/ride_recorder.dart';
 import '../blocks/bell_block.dart';
+import '../blocks/button_set_block.dart';
 import '../blocks/leave_ride_block.dart';
 import '../blocks/map_command_block.dart';
 import '../blocks/radar_block.dart';
@@ -48,6 +49,8 @@ class NotchBand extends StatefulWidget {
     this.radar,
     this.onSleep,
     this.onMapCommand,
+    this.currentButtonSet,
+    this.onNextButtonSet,
     this.onChooseWorkout,
     this.onLeaveRide,
     this.onChooseRoute,
@@ -75,6 +78,12 @@ class NotchBand extends StatefulWidget {
   /// Un pas sur la carte (zoom, déplacement, recentrage) — voir
   /// [MapCommandControl]. Nul sur un profil sans carte, comme [onSleep].
   final void Function(MapCommand command)? onMapCommand;
+
+  /// Le set de commandes en cours et le passage au suivant, pour la case
+  /// `next_button_set` — voir [ButtonSetControl]. [onNextButtonSet] est nul
+  /// avec un seul set ; sans [currentButtonSet], la case reste vide.
+  final ValueListenable<ButtonSet>? currentButtonSet;
+  final VoidCallback? onNextButtonSet;
 
   /// Ouvre le choix de programme d'entraînement, sur un tap d'un côté réglé
   /// sur `toggle_workout` — voir [ToggleWorkoutControl]. Toujours
@@ -302,6 +311,13 @@ class _NotchBandState extends State<NotchBand> {
           ),
         BandAction.togglePause =>
           TogglePauseControl(recorder: widget.recorder, compact: true, color: color),
+        BandAction.nextButtonSet => widget.currentButtonSet == null
+            ? const SizedBox.shrink()
+            : ButtonSetControl(
+                current: widget.currentButtonSet!,
+                onNext: widget.onNextButtonSet,
+                color: color,
+              ),
       };
 
   // Pas de `FittedBox` externe ici, à l'inverse de [_metric] :
