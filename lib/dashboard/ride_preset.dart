@@ -1017,6 +1017,8 @@ sealed class BandSlot {
     if (raw == 'leave_ride') return const BandActionSlot(BandAction.leaveRide);
     if (raw == 'route') return const BandActionSlot(BandAction.route);
     if (raw == 'toggle_pause') return const BandActionSlot(BandAction.togglePause);
+    final mapCommand = MapCommand.parse(raw);
+    if (mapCommand != null) return BandMapSlot(mapCommand);
     if (raw is String && raw.startsWith('bell_')) {
       return BandBellSlot(_bellSoundOf(raw.substring('bell_'.length)));
     }
@@ -1093,6 +1095,7 @@ sealed class BandSlot {
         BandWorkoutSlot(:final mode, :final upcoming) =>
           BandWorkoutSlot(mode, upcoming: upcoming, color: color),
         BandBellSlot(:final sound) => BandBellSlot(sound, color: color),
+        BandMapSlot(:final command) => BandMapSlot(command, color: color),
         BandMarkLapSlot(:final series, :final label) =>
           BandMarkLapSlot(series: series, label: label, color: color),
       };
@@ -1249,6 +1252,40 @@ class BandMetricSlot extends BandSlot {
 /// case de bandeau/encoche n'est pas l'endroit pour clore la sortie, on
 /// termine au retour depuis l'écran des capteurs.
 enum BandAction { sleep, toggleWorkout, leaveRide, route, togglePause }
+
+/// Un pas sur la carte : zoom, déplacement ou recentrage. Partagé entre les
+/// cases de bandeau/encoche ([BandMapSlot]) et les boutons physiques
+/// ([MapCommandAction]) — mêmes jetons que `CompanionSettings::MAP_COMMANDS`
+/// côté site, qui les expose aux deux catalogues.
+enum MapCommand {
+  zoomIn('map_zoom_in', '+'),
+  zoomOut('map_zoom_out', '−'),
+  panUp('map_pan_up', 'Haut'),
+  panDown('map_pan_down', 'Bas'),
+  panLeft('map_pan_left', 'Gauche'),
+  panRight('map_pan_right', 'Droite'),
+  recenter('map_recenter', 'Centrer');
+
+  const MapCommand(this.token, this.label);
+  final String token;
+
+  /// Libellé court de la case, en français comme le reste de l'appli.
+  final String label;
+
+  /// `null` sur un jeton inconnu : un profil plus récent que l'appli ne doit
+  /// rien casser, la case ou le geste ne fait simplement rien.
+  static MapCommand? parse(Object? raw) {
+    for (final command in values) {
+      if (command.token == raw) return command;
+    }
+    return null;
+  }
+}
+
+class BandMapSlot extends BandSlot {
+  const BandMapSlot(this.command, {super.color});
+  final MapCommand command;
+}
 
 @immutable
 class BandActionSlot extends BandSlot {
@@ -1822,6 +1859,8 @@ sealed class ButtonAction {
     for (final sound in BellSound.values) {
       if (sound.key == raw) return RingBellAction(sound);
     }
+    final mapCommand = MapCommand.parse(raw);
+    if (mapCommand != null) return MapCommandAction(mapCommand);
     return switch (raw) {
       'next_page' => const NextPageAction(),
       'previous_page' => const PreviousPageAction(),
@@ -1833,6 +1872,13 @@ sealed class ButtonAction {
       _ => null,
     };
   }
+}
+
+/// Un pas sur la carte, relayé au WebView (`NavigationWebController.zoomMap`,
+/// `panMap`, `recenterMap`). Sans état : chaque geste est un pas.
+class MapCommandAction extends ButtonAction {
+  const MapCommandAction(this.command);
+  final MapCommand command;
 }
 
 class NextPageAction extends ButtonAction {

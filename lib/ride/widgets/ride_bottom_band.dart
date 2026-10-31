@@ -8,6 +8,7 @@ import '../../dashboard/ride_preset.dart';
 import '../../recording/ride_recorder.dart';
 import '../blocks/bell_block.dart';
 import '../blocks/leave_ride_block.dart';
+import '../blocks/map_command_block.dart';
 import '../blocks/radar_block.dart';
 import '../blocks/route_block.dart';
 import '../blocks/sleep_block.dart';
@@ -55,6 +56,7 @@ class RideBottomBand extends StatefulWidget {
     this.radar,
     this.onCalibratePower,
     this.onSleep,
+    this.onMapCommand,
     this.onChooseWorkout,
     this.onLeaveRide,
     this.onChooseRoute,
@@ -81,6 +83,10 @@ class RideBottomBand extends StatefulWidget {
   /// `null` sur un profil sans carte, comme la commande de la grille : rien
   /// à endormir.
   final VoidCallback? onSleep;
+
+  /// Un pas sur la carte (zoom, déplacement, recentrage) — voir
+  /// [MapCommandControl]. Nul sur un profil sans carte, comme [onSleep].
+  final void Function(MapCommand command)? onMapCommand;
 
   /// Calibrer le capteur de puissance, sur un tap des watts ou de leur zone.
   ///
@@ -185,6 +191,7 @@ class _RideBottomBandState extends State<RideBottomBand> {
       BandMetricSlot(:final metric, :final color, :final gaugeThresholds, :final gaugeThresholdColors) =>
         _metric(metric, index, color, gaugeThresholds, gaugeThresholdColors),
       BandActionSlot(:final action, :final color) => _action(action, color),
+      BandMapSlot(:final command, :final color) => _map(command, color),
       BandBellSlot(:final sound, :final color) => _bell(sound, color),
       BandRadarSlot(:final mode, :final color) => _radar(mode, color),
       BandWorkoutSlot(:final mode, :final upcoming, :final color) =>
@@ -238,6 +245,11 @@ class _RideBottomBandState extends State<RideBottomBand> {
 
   // Même marge que `BandMetricTile` : sans elle, l'icône touchait ses
   // voisines alors que chaque case de mesure en garde une.
+  Widget _map(MapCommand command, Color? color) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
+        child: MapCommandControl(command: command, onCommand: widget.onMapCommand, color: color),
+      );
+
   Widget _action(BandAction action, Color? color) => switch (action) {
         BandAction.sleep => Padding(
             padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),

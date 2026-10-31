@@ -1987,6 +1987,13 @@ class _RideShellPageState extends State<RideShellPage>
     if (action != null) _performButtonAction(action);
   }
 
+  /// Relaie un pas de caméra à la carte. Ne ramène pas sur la page carte (à
+  /// l'inverse de [_sleep]) : la commande est posée sur une touche ou une case de
+  /// bandeau justement pour agir sans quitter la page de données.
+  void _mapCommand(MapCommand command) {
+    unawaited(_web?.runMapCommand(command));
+  }
+
   void _performButtonAction(ButtonAction action) {
     switch (action) {
       case NextPageAction():
@@ -2017,6 +2024,8 @@ class _RideShellPageState extends State<RideShellPage>
         }
       case GoToPageAction(:final pageKey):
         _goToPageByKey(pageKey);
+      case MapCommandAction(:final command):
+        _mapCommand(command);
       case TogglePauseAction():
         // Même garde que `StartLapAction` : hors enregistrement, rien à
         // suspendre ou reprendre.
@@ -2468,6 +2477,7 @@ class _RideShellPageState extends State<RideShellPage>
                 // pour la commande de la grille (`DashboardPage.onSleep`
                 // plus bas).
                 onSleep: _preset.hasMap ? _sleep : null,
+                onMapCommand: _preset.hasMap ? _mapCommand : null,
                 // Sans rapport avec la carte, même raison que
                 // `DashboardPage.onStartWorkout` plus bas : un programme se
                 // démarre aussi bien sur home-trainer.
@@ -2532,6 +2542,7 @@ class _RideShellPageState extends State<RideShellPage>
                 recorder: widget.recorder,
                 radar: _preset.sensors.radar ? _radar : null,
                 onSleep: _preset.hasMap ? _sleep : null,
+                onMapCommand: _preset.hasMap ? _mapCommand : null,
                 onChooseWorkout: _chooseWorkout,
                 onLeaveRide: _leaveRide,
                 onChooseRoute: _preset.hasMap ? _chooseRoute : null,

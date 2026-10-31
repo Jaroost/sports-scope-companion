@@ -11,6 +11,7 @@ import '../../dashboard/ride_preset.dart';
 import '../../recording/ride_recorder.dart';
 import '../blocks/bell_block.dart';
 import '../blocks/leave_ride_block.dart';
+import '../blocks/map_command_block.dart';
 import '../blocks/radar_block.dart';
 import '../blocks/route_block.dart';
 import '../blocks/sleep_block.dart';
@@ -46,6 +47,7 @@ class NotchBand extends StatefulWidget {
     required this.recorder,
     this.radar,
     this.onSleep,
+    this.onMapCommand,
     this.onChooseWorkout,
     this.onLeaveRide,
     this.onChooseRoute,
@@ -69,6 +71,10 @@ class NotchBand extends StatefulWidget {
   /// [SleepControl]. `null` sur un profil sans carte, comme la commande de
   /// la grille : rien à endormir.
   final VoidCallback? onSleep;
+
+  /// Un pas sur la carte (zoom, déplacement, recentrage) — voir
+  /// [MapCommandControl]. Nul sur un profil sans carte, comme [onSleep].
+  final void Function(MapCommand command)? onMapCommand;
 
   /// Ouvre le choix de programme d'entraînement, sur un tap d'un côté réglé
   /// sur `toggle_workout` — voir [ToggleWorkoutControl]. Toujours
@@ -179,6 +185,7 @@ class _NotchBandState extends State<NotchBand> {
       BandMetricSlot(:final metric, :final color, :final gaugeThresholds, :final gaugeThresholdColors) =>
         _metric(metric, color, gaugeThresholds, gaugeThresholdColors),
       BandActionSlot(:final action, :final color) => _action(action, color),
+      BandMapSlot(:final command, :final color) => _map(command, color),
       BandBellSlot(:final sound, :final color) =>
         BellControl(mode: BellMode.compact, sound: sound, color: color),
       BandRadarSlot(:final mode, :final color) => _radar(mode, color),
@@ -268,6 +275,9 @@ class _NotchBandState extends State<NotchBand> {
       ),
     );
   }
+
+  Widget _map(MapCommand command, Color? color) =>
+      MapCommandControl(command: command, onCommand: widget.onMapCommand, color: color);
 
   Widget _action(BandAction action, Color? color) => switch (action) {
         BandAction.sleep =>

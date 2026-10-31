@@ -7,7 +7,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../account/site_session.dart';
 import '../ble/sensor_hub.dart';
-import '../dashboard/ride_preset.dart' show TraveledPathSettings;
+import '../dashboard/ride_preset.dart' show MapCommand, TraveledPathSettings;
 import '../navigation/navigation_target.dart';
 import '../navigation/sensor_bridge.dart';
 import '../phone/debug_log.dart';
@@ -359,6 +359,29 @@ class NavigationWebController {
       );
     } catch (e) {
       debugPrint('[web] focus POI ignoré : $e');
+    }
+  }
+
+  /// Exécute un pas de caméra (zoom, déplacement, recentrage) — télécommande,
+  /// Di2 et cases des bandes. Transitoire : jamais rejoué au rechargement de la
+  /// page, un pas perdu n'a pas à être refait. `?.` sur l'objet ET la méthode,
+  /// même garantie que [focusPoi] face à un site plus ancien.
+  Future<void> runMapCommand(MapCommand command) async {
+    final js = switch (command) {
+      MapCommand.zoomIn => 'zoomMap?.(1)',
+      MapCommand.zoomOut => 'zoomMap?.(-1)',
+      // Fractions de la vue, pas des pixels : l'appli ne connaît pas la taille
+      // du canevas. Un pas de 15 % garde de quoi se repérer d'un pas à l'autre.
+      MapCommand.panUp => 'panMap?.(0, -0.15)',
+      MapCommand.panDown => 'panMap?.(0, 0.15)',
+      MapCommand.panLeft => 'panMap?.(-0.15, 0)',
+      MapCommand.panRight => 'panMap?.(0.15, 0)',
+      MapCommand.recenter => 'recenterMap?.()',
+    };
+    try {
+      await webView.runJavaScript('void (window.sportsScopeCompanion?.$js);');
+    } catch (e) {
+      debugPrint('[web] commande carte ignorée : $e');
     }
   }
 

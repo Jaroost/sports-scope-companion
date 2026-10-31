@@ -389,6 +389,18 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
         silence = track
     }
 
+    /**
+     * Libère la session et coupe le canal d'événements. À appeler quand le moteur
+     * Flutter qui nous portait disparaît : Android ne prévient pas toujours
+     * [EventChannel.StreamHandler.onCancel] à la destruction d'un moteur, et une
+     * session laissée vivante continue de reprendre la place (`reclaim`) face à
+     * la nouvelle, dont elle vole les touches pour un Dart qui n'écoute plus.
+     */
+    fun dispose() {
+        stop()
+        sink = null
+    }
+
     private fun stop() {
         main.removeCallbacks(reclaimTask)
         main.removeCallbacks(periodicReclaim)

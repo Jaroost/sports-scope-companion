@@ -38,6 +38,15 @@ class RemoteKeyService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        // Certaines télécommandes envoient ACCUEIL sur l'appui long de l'une de leurs
+        // touches (vu au logcat : KEYCODE_HOME depuis la télécommande). Android le
+        // traite après le filtre, donc on peut l'avaler tant qu'une sortie est en
+        // cours. Seulement pour la télécommande — le téléphone garde son accueil.
+        // ALIMENTATION (l'autre appui long) ne passe jamais ici : Android la traite
+        // avant tout service d'accessibilité, impossible à bloquer depuis l'appli.
+        if (event.keyCode == KeyEvent.KEYCODE_HOME) {
+            return listener != null && RemoteKeys.isRemoteDevice(event.device)
+        }
         if (!isPlayPause(event.keyCode)) return false
         val handler = listener ?: return false
         if (!RemoteKeys.isRemoteDevice(event.device)) return false

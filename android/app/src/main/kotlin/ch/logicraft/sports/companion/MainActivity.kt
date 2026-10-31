@@ -23,6 +23,12 @@ class MainActivity : FlutterActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        remoteKeys?.dispose()
+        remoteKeys = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -32,6 +38,10 @@ class MainActivity : FlutterActivity() {
 
         // Banc d'essai de la télécommande : la session média ne s'active qu'au
         // premier abonné, côté Dart.
+        // Un moteur recréé (rotation, reprise après arrière-plan) repasse ici : sans
+        // libérer l'ancienne instance, deux sessions média « SportsScopeRemote »
+        // coexistent et se disputent les touches — la moitié se perdait.
+        remoteKeys?.dispose()
         remoteKeys = RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, COOKIES_CHANNEL)
