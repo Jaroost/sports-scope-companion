@@ -50,7 +50,8 @@ class RemoteKeyEvent {
     this.device,
   });
 
-  /// `accessibility` (lecture/pause vue par le service d'accessibilité, avant
+  /// `status` (`ORDER_*` : rang de notre session dans la liste d'Android, qui
+  /// n'est pas l'ordre des touches — jamais une touche), `accessibility` (lecture/pause vue par le service d'accessibilité, avant
   /// l'assistant : la seule voie qui livre l'appui long), `media` (session
   /// média : lecture, suivant…), `volume` (sens d'une
   /// pression, via le fournisseur de volume) ou `activity` (touche vue par la
@@ -136,6 +137,26 @@ class AndroidRemoteKeys {
     } catch (e) {
       debugPrint('[télécommande] état du service illisible : $e');
       return false;
+    }
+  }
+
+  /// L'accès aux notifications est-il accordé ? Il permet au natif de lire quelle
+  /// session reçoit les touches et de ne reprendre sa place que si besoin.
+  Future<bool> notificationAccessGranted() async {
+    try {
+      return await _control.invokeMethod<bool>('notificationAccessGranted') ??
+          false;
+    } catch (e) {
+      debugPrint('[télécommande] accès notifications illisible : $e');
+      return false;
+    }
+  }
+
+  Future<void> openNotificationAccessSettings() async {
+    try {
+      await _control.invokeMethod<void>('openNotificationAccessSettings');
+    } catch (e) {
+      debugPrint('[télécommande] réglages non ouverts : $e');
     }
   }
 

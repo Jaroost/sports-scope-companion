@@ -1945,7 +1945,7 @@ class _RideShellPageState extends State<RideShellPage>
     // session : une ligne par appui *et* par relâchement, y compris pour les
     // boutons du téléphone. Prise pour une touche, elle doublait chaque geste
     // (mesuré : 2 clics pour une pression du téléphone, 3 pour la télécommande).
-    if (event.source == 'activity') return;
+    if (event.source == 'activity' || event.source == 'status') return;
     final key = RemoteKey.ofNative(event.key);
     if (key == null) return;
     if (key.isVolume) {

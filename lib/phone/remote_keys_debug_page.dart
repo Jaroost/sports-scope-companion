@@ -36,6 +36,8 @@ class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage>
   final _entries = <String>[];
   StreamSubscription<RemoteKeyEvent>? _sub;
   bool? _accessibility;
+  bool? _notificationAccess;
+  RemoteKeyEvent? _status;
 
   @override
   void initState() {
@@ -43,6 +45,12 @@ class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage>
     WidgetsBinding.instance.addObserver(this);
     _sub = const AndroidRemoteKeys().events().listen(_record);
     unawaited(_refreshAccessibility());
+    unawaited(_refreshNotificationAccess());
+  }
+
+  Future<void> _refreshNotificationAccess() async {
+    final granted = await const AndroidRemoteKeys().notificationAccessGranted();
+    if (mounted) setState(() => _notificationAccess = granted);
   }
 
   Future<void> _refreshAccessibility() async {
@@ -53,7 +61,10 @@ class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage>
   // On revient des réglages d'accessibilité : relire l'état du service.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_refreshAccessibility());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshAccessibility());
+      unawaited(_refreshNotificationAccess());
+    }
   }
 
   @override
@@ -67,6 +78,7 @@ class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage>
     final line = event.toString();
     DebugLog.instance.add('[télécommande] $line');
     if (!mounted) return;
+    if (event.source == 'status') setState(() => _status = event);
     final now = DateTime.now();
     final stamp = '${now.minute.toString().padLeft(2, '0')}:'
         '${now.second.toString().padLeft(2, '0')}.'
@@ -97,6 +109,30 @@ class _RemoteKeysDebugPageState extends State<RemoteKeysDebugPage>
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
+          if (_notificationAccess == false)
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.notifications_off_outlined),
+              title: const Text('Reprise des touches à l’aveugle'),
+              subtitle: const Text(
+                  'Sans accès aux notifications, on ne sait pas si la session '
+                  'reçoit les touches. Active « Sports Scope — télécommande ».'),
+              trailing: TextButton(
+                onPressed: () => const AndroidRemoteKeys()
+                    .openNotificationAccessSettings(),
+                child: const Text('Réglages'),
+              ),
+            )
+          else if (_status case final status?)
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.info_outline),
+              title: const Text('Ordre des sessions (indicatif)'),
+              subtitle: Text(
+                  '${status.device ?? ''}\nAndroid route les touches vers '
+                  'l’appli qui a démarré du son en dernier : seule une touche '
+                  'reçue ici le prouve.'),
+            ),
           if (_accessibility == false)
             ListTile(
               dense: true,

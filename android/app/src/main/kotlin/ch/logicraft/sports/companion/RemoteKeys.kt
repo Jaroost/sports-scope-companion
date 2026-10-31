@@ -1,5 +1,6 @@
 package ch.logicraft.sports.companion
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -9,7 +10,9 @@ import android.media.AudioPlaybackConfiguration
 import android.os.SystemClock
 import android.media.AudioTrack
 import android.media.VolumeProvider
+import android.media.session.MediaController
 import android.media.session.MediaSession
+import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Build
 import android.os.Handler
@@ -70,12 +73,105 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
      */
     private val playbackWatcher = object : AudioManager.AudioPlaybackCallback() {
         override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {
-            // Notre propre silence déclenche aussi ce rappel, et reprendre la
-            // place le relance : le délai coupe la boucle.
-            val now = SystemClock.elapsedRealtime()
-            if (now - lastReclaimMs < RECLAIM_COOLDOWN_MS) return
-            reclaim()
+            // Notre propre reprise de place provoque aussi ce rappel, tout de
+            // suite après : on l'ignore pour ne pas boucler. Tout autre
+            // changement est différé et non jeté : le rappel part quand le son
+            // de l'autre appli démarre, mais sa *session* ne passe « en lecture »
+            // que quelques instants plus tard — reprendre la place aussitôt la
+            // laisserait devant nous.
+            if (SystemClock.elapsedRealtime() - lastReclaimMs < SELF_CALLBACK_MS) return
+            scheduleReclaim()
         }
+    }
+
+    private val sessionManager =
+        appContext.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+    private val listenerComponent = ComponentName(appContext, RemoteSessionListener::class.java)
+    private var reclaimCount = 0
+    private var lastStatus: String? = null
+
+    /** L'accès aux notifications est-il accordé (il rend les sessions lisibles) ? */
+    private fun listenerGranted(): Boolean =
+        android.provider.Settings.Secure
+            .getString(appContext.contentResolver, "enabled_notification_listeners")
+            ?.contains(listenerComponent.flattenToString()) == true
+
+    /** Les sessions média, la destinataire des touches en tête ; `null` si illisible. */
+    private fun activeSessions(): List<MediaController>? =
+        if (!listenerGranted()) null
+        else try {
+            sessionManager.getActiveSessions(listenerComponent)
+        } catch (_: SecurityException) {
+            null
+        }
+
+    /**
+     * Notre session est-elle celle qui reçoit les touches ? `null` : on ne peut
+     * pas le savoir (accès aux notifications non accordé).
+     */
+    private fun isFront(): Boolean? {
+        val mine = session?.sessionToken ?: return null
+        val first = activeSessions()?.firstOrNull() ?: return null
+        return first.sessionToken == mine
+    }
+
+    /**
+     * Reprend la place seulement si on n'est pas devant, puis revérifie et dit à
+     * Dart ce qu'il en est. Sans accès aux notifications, on ne sait pas : on
+     * reprend à l'aveugle, comme avant.
+     */
+    private fun ensureFront() {
+        if (session == null) return
+        // L'ordre des sessions n'est pas celui des touches (voir
+        // [restartSilence]) : on ne s'en sert pas pour décider de s'abstenir.
+        reclaim()
+        reclaimCount++
+        main.removeCallbacks(verifyTask)
+        main.postDelayed(verifyTask, VERIFY_DELAY_MS)
+    }
+
+    private val verifyTask = Runnable { if (session != null) publishStatus(isFront()) }
+
+    /** Une ligne par *changement* : le banc d'essai n'a pas à être noyé. */
+    private fun publishStatus(front: Boolean?) {
+        val owner = activeSessions()?.firstOrNull()?.packageName
+        val key = when (front) {
+            true -> "ORDER_FIRST"
+            false -> "ORDER_OTHER"
+            null -> "ORDER_UNKNOWN"
+        }
+        val signature = "$key|$owner|$reclaimCount"
+        if (signature == lastStatus) return
+        lastStatus = signature
+        emit(
+            mapOf(
+                "source" to "status",
+                "key" to key,
+                "device" to "destinataire=${owner ?: "?"} reprises=$reclaimCount",
+            )
+        )
+    }
+
+    private val reclaimTask = Runnable { ensureFront() }
+
+    /**
+     * Filet : les rappels ne couvrent pas tous les cas (musique lancée appli en
+     * arrière-plan, session qui passe devant sans changement audio visible).
+     * Reprendre la place à intervalle régulier garantit qu'on ne reste jamais
+     * longtemps derrière une autre appli. La session n'a ni interface ni son :
+     * la bascule pause/lecture ne se voit nulle part.
+     */
+    private val periodicReclaim = object : Runnable {
+        override fun run() {
+            if (session == null) return
+            ensureFront()
+            main.postDelayed(this, PERIODIC_RECLAIM_MS)
+        }
+    }
+
+    private fun scheduleReclaim() {
+        main.removeCallbacks(reclaimTask)
+        for (delay in RECLAIM_DELAYS_MS) main.postDelayed(reclaimTask, delay)
     }
 
     init {
@@ -87,6 +183,14 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
                     result.success(null)
                 }
                 "accessibilityEnabled" -> result.success(RemoteKeyService.isEnabled)
+                "notificationAccessGranted" -> result.success(listenerGranted())
+                "openNotificationAccessSettings" -> {
+                    appContext.startActivity(
+                        Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                    result.success(null)
+                }
                 "openAccessibilitySettings" -> {
                     appContext.startActivity(
                         Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -176,6 +280,7 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
         setState(PlaybackState.STATE_PLAYING)
         startSilence()
         audio.registerAudioPlaybackCallback(playbackWatcher, main)
+        main.postDelayed(periodicReclaim, PERIODIC_RECLAIM_MS)
 
         // Lecture/pause passe d'abord par le service d'accessibilité s'il est
         // activé : c'est le seul chemin où l'appui long n'ouvre pas l'assistant.
@@ -219,6 +324,33 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
         lastReclaimMs = SystemClock.elapsedRealtime()
         setState(PlaybackState.STATE_PAUSED)
         setState(PlaybackState.STATE_PLAYING)
+        restartSilence()
+    }
+
+    /**
+     * Android adresse les touches média à l'appli qui a **démarré** du son en
+     * dernier. Un silence qui tourne en boucle depuis le début ne redémarre
+     * jamais : dès qu'une musique démarre après lui, elle passe devant, et
+     * l'état de la session n'y change rien. Il faut l'arrêter puis le relancer
+     * — en deux temps, sinon le système fusionne les deux changements et ne voit
+     * aucun démarrage.
+     */
+    private fun restartSilence() {
+        val track = silence ?: return
+        try {
+            track.pause()
+        } catch (_: IllegalStateException) {
+            return
+        }
+        main.removeCallbacks(resumeSilenceTask)
+        main.postDelayed(resumeSilenceTask, SILENCE_GAP_MS)
+    }
+
+    private val resumeSilenceTask = Runnable {
+        try {
+            silence?.play()
+        } catch (_: IllegalStateException) {
+        }
     }
 
     /**
@@ -258,6 +390,12 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
     }
 
     private fun stop() {
+        main.removeCallbacks(reclaimTask)
+        main.removeCallbacks(periodicReclaim)
+        main.removeCallbacks(verifyTask)
+        main.removeCallbacks(resumeSilenceTask)
+        lastStatus = null
+        reclaimCount = 0
         // Avant tout : hors session, la télécommande retrouve son assistant.
         RemoteKeyService.listener = null
         audio.unregisterAudioPlaybackCallback(playbackWatcher)
@@ -366,7 +504,11 @@ class RemoteKeys(context: Context, messenger: BinaryMessenger) {
     companion object {
         private const val NAMESPACE = "sports_scope/remote_keys"
         private const val SILENCE_RATE = 8000
-        private const val RECLAIM_COOLDOWN_MS = 1500L
+        private const val SILENCE_GAP_MS = 150L
+        private const val VERIFY_DELAY_MS = 400L
+        private const val PERIODIC_RECLAIM_MS = 2000L
+        private const val SELF_CALLBACK_MS = 300L
+        private val RECLAIM_DELAYS_MS = longArrayOf(400L, 1500L)
 
         /**
          * La télécommande du cycliste, telle que `getevent -il` la voit :
