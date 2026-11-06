@@ -18,6 +18,7 @@ import '../devices/known_devices_store.dart';
 import '../navigation/navigation_picker_sheet.dart';
 import '../navigation/navigation_target.dart';
 import '../phone/media_control.dart';
+import '../phone/torch_control.dart';
 import '../navigation/route_catalog_store.dart';
 import '../navigation/screen_dimmer.dart';
 import '../network/data_saver.dart';
@@ -2068,6 +2069,8 @@ class _RideShellPageState extends State<RideShellPage>
         _mapCommand(command);
       case MediaCommandAction(:final command):
         unawaited(MediaControl.run(command));
+      case ToggleTorchAction():
+        unawaited(TorchControl.toggle());
       case TogglePauseAction():
         // Même garde que `StartLapAction` : hors enregistrement, rien à
         // suspendre ou reprendre.

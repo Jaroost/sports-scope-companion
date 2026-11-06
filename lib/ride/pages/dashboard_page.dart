@@ -38,6 +38,7 @@ import '../blocks/recording_block.dart';
 import '../blocks/route_block.dart';
 import '../blocks/bell_block.dart';
 import '../blocks/leave_ride_block.dart';
+import '../blocks/torch_block.dart';
 import '../blocks/sleep_block.dart';
 import '../blocks/toggle_workout_block.dart';
 import '../blocks/training_budget_block.dart';
@@ -600,6 +601,11 @@ class DashboardPage extends StatelessWidget {
             mode: leaveRide.mode,
             color: leaveRide.color,
             textColor: leaveRide.textColor,
+          ),
+        final TorchBlock torch => TorchCommandControl(
+            mode: torch.mode,
+            color: torch.color,
+            textColor: torch.textColor,
           ),
         final BellBlock bell => BellControl(
             mode: bell.mode,
