@@ -74,7 +74,10 @@ class _ElevationProfilePainter extends CustomPainter {
   final double? ratio;
   final bool dark;
 
-  static const _done = Color(0xFF9CA3AF);
+  // Voile blanc posé sur les couleurs de pente de la portion faite (fond clair) :
+  // même 0.6 que le site (NavClimbCard), la difficulté reste lisible. Le fond
+  // sombre fait pareil avec `_darkDoneScrim`.
+  static const _doneVeil = Color(0x99FFFFFF);
   static const _bg = Color(0xFFF8F9FA);
   // Mêmes valeurs que `MetricTrendGraph` : fond, halo de libellé et voile
   // « déjà fait » d'une page de données doivent se ressembler d'un graphique à
@@ -133,8 +136,9 @@ class _ElevationProfilePainter extends CustomPainter {
     final ratio = this.ratio;
     if (ratio == null) return;
 
-    // Portion déjà faite : l'aire entière redessinée en gris, clippée à
-    // gauche du curseur — équivalent du clip-path SVG du site.
+    // Portion déjà faite : l'aire entière voilée de blanc par-dessus les
+    // couleurs de pente, clippée à gauche du curseur — équivalent du clip-path
+    // SVG du site.
     canvas.save();
     canvas.clipRect(Rect.fromLTWH(0, 0, size.width * ratio, size.height));
     final area = Path()..moveTo(xOf(pts.first.distM), size.height);
@@ -144,7 +148,7 @@ class _ElevationProfilePainter extends CustomPainter {
     area
       ..lineTo(xOf(pts.last.distM), size.height)
       ..close();
-    canvas.drawPath(area, Paint()..color = _done);
+    canvas.drawPath(area, Paint()..color = _doneVeil);
     canvas.restore();
 
     // Curseur : ligne verticale + point sur la ligne d'altitude, interpolée
