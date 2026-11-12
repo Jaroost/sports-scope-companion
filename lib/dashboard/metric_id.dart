@@ -581,7 +581,17 @@ enum MetricId {
     final windowS = _effectiveWindowS(sources, computeWindowS);
     double? speedMps;
     if (windowS == null) {
-      speedMps = _movingAvgSpeedMps(stats);
+      // Sur un tour, `stats.distanceM` est la distance cumulée de la SORTIE
+      // (RideStats.add y pose `point.distanceM`) : la diviser par le temps
+      // roulé du tour gonflait la moyenne dès le deuxième tour. On retranche
+      // le repère de départ du tour (`RideLap.distanceM`).
+      final lap = sources.lap;
+      if (lap != null) {
+        final movingS = stats.movingTime.inMilliseconds / 1000;
+        speedMps = movingS > 0 ? lap.distanceM / movingS : null;
+      } else {
+        speedMps = _movingAvgSpeedMps(stats);
+      }
     } else {
       final recorder = sources.recorder;
       final distanceDeltaM = _windowedDelta(recorder.distanceTrack, windowS);

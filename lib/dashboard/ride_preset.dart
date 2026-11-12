@@ -1042,6 +1042,7 @@ sealed class BandSlot {
     if (raw == 'route') return const BandActionSlot(BandAction.route);
     if (raw == 'toggle_pause') return const BandActionSlot(BandAction.togglePause);
     if (raw == 'next_button_set') return const BandActionSlot(BandAction.nextButtonSet);
+    if (raw == 'toggle_torch') return const BandActionSlot(BandAction.toggleTorch);
     final mapCommand = MapCommand.parse(raw);
     if (mapCommand != null) return BandMapSlot(mapCommand);
     final mediaCommand = MediaCommand.parse(raw);
@@ -1279,7 +1280,9 @@ class BandMetricSlot extends BandSlot {
 /// seul lequel des deux gestes il pose. Pas de bouton d'arrêt à côté : une
 /// case de bandeau/encoche n'est pas l'endroit pour clore la sortie, on
 /// termine au retour depuis l'écran des capteurs.
-enum BandAction { sleep, toggleWorkout, leaveRide, route, togglePause, nextButtonSet }
+/// `toggleTorch` allume ou éteint la lampe torche du téléphone
+/// ([TorchCommandControl], `ride/blocks/torch_block.dart`).
+enum BandAction { sleep, toggleWorkout, leaveRide, route, togglePause, nextButtonSet, toggleTorch }
 
 /// Un pas sur la carte : zoom, déplacement ou recentrage. Partagé entre les
 /// cases de bandeau/encoche ([BandMapSlot]) et les boutons physiques
@@ -1930,6 +1933,7 @@ sealed class ButtonAction {
       'toggle_sleep' => const ToggleSleepAction(),
       'toggle_pause' => const TogglePauseAction(),
       'next_button_set' => const NextButtonSetAction(),
+      'toggle_torch' => const ToggleTorchAction(),
       _ => null,
     };
   }
@@ -1998,6 +2002,11 @@ class ToggleSleepAction extends ButtonAction {
 /// n'est pas un geste de route, il se fait depuis l'écran des capteurs.
 class TogglePauseAction extends ButtonAction {
   const TogglePauseAction();
+}
+
+/// Allume ou éteint la lampe torche du téléphone (`TorchControl`).
+class ToggleTorchAction extends ButtonAction {
+  const ToggleTorchAction();
 }
 
 /// Passe au set de commandes suivant (voir [ButtonSet]), en boucle. Résolu dans

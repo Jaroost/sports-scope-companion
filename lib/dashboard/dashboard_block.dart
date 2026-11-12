@@ -178,6 +178,11 @@ sealed class DashboardBlock {
           color: color,
           textColor: textColor,
         ),
+      'torch' => TorchBlock(
+          mode: _modeOf(raw['mode'], TorchMode.values),
+          color: color,
+          textColor: textColor,
+        ),
       'bell' => BellBlock(
           mode: _modeOf(raw['mode'], BellMode.values),
           sound: _modeOf(raw['sound'], BellSound.values),
@@ -1547,6 +1552,42 @@ enum LeaveRideMode with BlockMode {
   compact('compact');
 
   const LeaveRideMode(this.key);
+
+  @override
+  final String key;
+}
+
+/// Allume ou éteint la lampe torche du téléphone — voir [TorchCommandControl]
+/// (`torch_block.dart`). Même jeton que `toggle_torch` sur une touche ou une
+/// case de bandeau.
+class TorchBlock extends DashboardBlock {
+  const TorchBlock({
+    this.mode = TorchMode.full,
+    super.color,
+    super.textColor,
+  });
+
+  final TorchMode mode;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TorchBlock &&
+      other.mode == mode &&
+      other.color == color &&
+      other.textColor == textColor;
+
+  @override
+  int get hashCode => Object.hash(mode, color, textColor);
+}
+
+enum TorchMode with BlockMode {
+  /// Le bouton large.
+  full('full'),
+
+  /// L'icône seule, pour une cellule de grille.
+  compact('compact');
+
+  const TorchMode(this.key);
 
   @override
   final String key;

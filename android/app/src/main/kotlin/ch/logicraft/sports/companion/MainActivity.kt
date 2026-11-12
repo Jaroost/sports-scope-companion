@@ -46,6 +46,8 @@ class MainActivity : FlutterActivity() {
 
         MediaControl(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
+        TorchControl(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, COOKIES_CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "flush") {

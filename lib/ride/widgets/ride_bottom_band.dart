@@ -11,6 +11,7 @@ import '../blocks/button_set_block.dart';
 import '../blocks/leave_ride_block.dart';
 import '../blocks/map_command_block.dart';
 import '../blocks/media_command_block.dart';
+import '../blocks/torch_block.dart';
 import '../blocks/radar_block.dart';
 import '../blocks/route_block.dart';
 import '../blocks/sleep_block.dart';
@@ -301,6 +302,10 @@ class _RideBottomBandState extends State<RideBottomBand> {
         BandAction.togglePause => Padding(
             padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
             child: TogglePauseControl(recorder: widget.recorder, compact: true, color: color),
+          ),
+        BandAction.toggleTorch => Padding(
+            padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
+            child: TorchCommandControl(color: color),
           ),
         BandAction.nextButtonSet => Padding(
             padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
