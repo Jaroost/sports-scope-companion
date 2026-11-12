@@ -783,6 +783,14 @@ class _RideShellPageState extends State<RideShellPage>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WidgetsBinding.instance.addObserver(this);
 
+    // Sans carte, personne ne tient l'écran allumé : avec elle, c'est la page
+    // web qui le fait, et l'accueil a rendu le sien en nous laissant la main
+    // (`didPushNext`). Un home-trainer s'éteignait donc au bout du délai de
+    // veille du téléphone. Pas de rappel à `false` au `dispose` : l'accueil le
+    // reprend à notre retour (`didPopNext`), et ce `dispose` arrive après —
+    // l'effacer ici éteindrait la veille qu'il vient de reposer.
+    if (!_preset.hasMap) unawaited(_screen.setKeepScreenOn(true));
+
     _baseRidePages = _preset.ridePages;
     widget.dataSaver.addListener(_onDataSaverChanged);
     _baseMenuPages = _preset.menuPages;
