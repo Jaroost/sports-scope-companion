@@ -507,6 +507,9 @@ class _RideShellPageState extends State<RideShellPage>
 
   int get _pageCount => _ridePages.length;
 
+  /// Avec une seule page, il n'y a nulle part où aller : ni glissé, ni bandes de bord.
+  bool get _hasSeveralPages => _pageCount > 1;
+
   /// La page affichée, index dans le défilement.
   int get _page => pageOf(_rawPage, count: _pageCount);
 
@@ -2400,7 +2403,7 @@ class _RideShellPageState extends State<RideShellPage>
                 right: 0,
                 top: 0,
                 bottom: bandHeight,
-                child: MapSwipeZone(pages: _pages, enabled: _onMap),
+                child: MapSwipeZone(pages: _pages, enabled: _onMap && _hasSeveralPages),
               ),
             // Les pages de données, dans le même cadre, opaques quand elles sont
             // là. La page carte est vide : c'est le WebView qu'on voit à travers.
@@ -2424,6 +2427,14 @@ class _RideShellPageState extends State<RideShellPage>
                 ignoring: _onMap,
                 child: PageView.builder(
                   controller: _pages,
+                  // Une seule page : le catalogue est circulaire, un glissé
+                  // « changerait » donc de page pour retomber sur la même et
+                  // ferait trembler l'écran. La physique ne change qu'avec le
+                  // nombre de pages (ajout d'une page conditionnelle), jamais
+                  // en plein geste.
+                  physics: _hasSeveralPages
+                      ? null
+                      : const NeverScrollableScrollPhysics(),
                   onPageChanged: _onPageChanged,
                   itemBuilder: (context, rawPage) =>
                       _pageAt(pageOf(rawPage, count: _pageCount)),
@@ -3025,7 +3036,7 @@ class _RideShellPageState extends State<RideShellPage>
             children: [
               if (_overlay)
                 Positioned.fill(child: RadarSideGauge(view: radar, side: side)),
-              if (_onMap)
+              if (_onMap && _hasSeveralPages)
                 Positioned(
                   left: left ? 0 : null,
                   right: left ? null : 0,
