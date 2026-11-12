@@ -972,6 +972,31 @@ non plus. Le radar reste néanmoins visible tel quel : le cadre (`RadarFrame`)
 et les mètres de l'encoche (`RadarDistanceBadges`) ne dépendent pas de la
 veille et s'affichent tout du long quand le profil garde l'habillage radar.
 
+## Le relais Bluetooth vers une montre (`lib/ble/relay/`)
+
+Le téléphone se présente en **périphérique** BLE (serveur GATT + publicité,
+`android/…/BleRelay.kt`) et rediffuse les capteurs qu'il a réussi à connecter, pour
+un récepteur qui n'y arrive pas : une Garmin face à un home-trainer qui n'accepte
+qu'une connexion. Réglage **local** (`RelayStore`, `relay_settings.json`), carte
+`RelayCard` sur la page Capteurs — ce n'est pas une donnée du compte, donc pas dans
+les profils du site.
+
+- **Éteint par défaut** : rien n'est annoncé tant que le cycliste ne l'a pas voulu.
+- **Une case par information** (`relayableKinds` : cardio, puissance,
+  vitesse/cadence). Le Di2, le radar et la batterie ne sont jamais relayés.
+- **Trames brutes, octets pour octets** (`RawFrame.source` dit d'où elles
+  viennent) : pas de ré-encodage. Conséquence : le réglage porte sur une
+  caractéristique entière, la cadence glissée dans la trame de puissance part avec
+  elle.
+- **`RelayGate`** : une seule source par mesure (les compteurs cumulés ne se
+  tricotent pas), relève après 5 s de silence.
+- Les services annoncés ne changent pas à chaud : modifier une case redémarre le
+  relais. Permission `BLUETOOTH_ADVERTISE` (Android 12+).
+- Le relais ne vit que tant que le processus vit : il n'a pas de service au
+  premier plan à lui (celui du GPS en fournit un pendant un enregistrement avec GPS).
+- **Non vérifié sur matériel** : la valeur déclarée de *Cycling Power Feature*
+  (0x0F) et l'acceptation par une Forerunner restent à mesurer sur le téléphone.
+
 ## Calibrer un capteur de puissance
 
 C'est le **seul endroit où l'appli écrit** sur un capteur : tout le reste est en

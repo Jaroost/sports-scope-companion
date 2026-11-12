@@ -264,7 +264,8 @@ class SensorConnection {
     if (data.isEmpty || _disposed) return;
     final at = DateTime.now();
 
-    _rawFrames.add(RawFrame(at, decoder.characteristic.str, data));
+    _rawFrames.add(RawFrame(at, decoder.characteristic.str, data,
+        source: device.remoteId.str));
 
     for (final sample in decoder.decode(data, at)) {
       // Retenu à part : voir le commentaire de [batteryLevel].
@@ -305,7 +306,8 @@ class SensorConnection {
       sub = control.onValueReceived.listen((data) {
         // Publiée comme n'importe quelle trame : la réponse d'un capteur qui
         // refuse est exactement ce qu'on veut relire dans « Trames brutes ».
-        _rawFrames.add(RawFrame(DateTime.now(), control.uuid.str, data));
+        _rawFrames.add(RawFrame(DateTime.now(), control.uuid.str, data,
+            source: device.remoteId.str));
         final result = calibrationResponseOf(data);
         if (result != null && !answer.isCompleted) answer.complete(result);
       });

@@ -10,6 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
 
     private var remoteKeys: RemoteKeys? = null
+    private var bleRelay: BleRelay? = null
 
     /**
      * Laisse la sonde de la télécommande voir chaque touche avant son routage
@@ -26,6 +27,8 @@ class MainActivity : FlutterActivity() {
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         remoteKeys?.dispose()
         remoteKeys = null
+        bleRelay?.shutdown()
+        bleRelay = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -43,6 +46,10 @@ class MainActivity : FlutterActivity() {
         // coexistent et se disputent les touches — la moitié se perdait.
         remoteKeys?.dispose()
         remoteKeys = RemoteKeys(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
+        // Le relais n'annonce rien tant que Dart n'a pas fait `start`.
+        bleRelay?.shutdown()
+        bleRelay = BleRelay(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 
         MediaControl(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
 

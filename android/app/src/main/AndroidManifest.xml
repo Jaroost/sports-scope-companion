@@ -6,6 +6,10 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Android 12+ : le relais se rend visible en Bluetooth (publicité) pour
+         qu'une montre s'y connecte. Voir BleRelay.kt. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
     <!-- Android 11 et antérieurs : l'ancien modèle, où scanner exigeait la
          localisation fine. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />

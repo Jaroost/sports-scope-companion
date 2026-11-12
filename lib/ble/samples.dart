@@ -144,9 +144,14 @@ class RadarSample extends SensorSample {
 /// jour où un firmware Shimano change la trame, les sorties déjà enregistrées
 /// restent re-décodables a posteriori.
 class RawFrame {
-  const RawFrame(this.at, this.characteristicUuid, this.bytes);
+  const RawFrame(this.at, this.characteristicUuid, this.bytes, {this.source});
 
   final DateTime at;
+
+  /// L'appareil d'où vient la trame (`remoteId`). Sert au relais : deux
+  /// capteurs qui parlent sur la même caractéristique ne doivent pas se
+  /// tricoter dans le flux qu'on rediffuse. `null` pour une trame fabriquée.
+  final String? source;
   final String characteristicUuid;
   final List<int> bytes;
 

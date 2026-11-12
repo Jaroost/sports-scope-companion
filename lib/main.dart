@@ -12,6 +12,8 @@ import 'account/rider_profile_store.dart';
 import 'training/training_budget_store.dart';
 import 'account/site_session.dart';
 import 'account/threshold_gap.dart';
+import 'ble/relay/ble_relay.dart';
+import 'ble/relay/relay_store.dart';
 import 'ble/sensor_hub.dart';
 import 'dashboard/companion_settings_fetch.dart';
 import 'dashboard/companion_settings_store.dart';
@@ -86,7 +88,9 @@ Future<void> main() async {
   // réglage choisi lors d'une sortie précédente reste visible dès l'accueil,
   // plutôt que de retomber sur « désactivée » jusqu'au premier changement.
   final dataSaver = await DataSaverStore.open();
+  final relaySettings = await RelayStore.open();
   runApp(SportsScopeApp(
+    relaySettings: relaySettings,
     devices: devices,
     rides: rides,
     session: session,
@@ -111,6 +115,7 @@ class SportsScopeApp extends StatefulWidget {
     required this.trainingPrograms,
     required this.settings,
     required this.dataSaver,
+    required this.relaySettings,
   });
 
   final KnownDevicesStore devices;
@@ -136,6 +141,9 @@ class SportsScopeApp extends StatefulWidget {
   /// l'application, comme les autres réglages du compte : il doit survivre au
   /// retour à l'accueil et être visible avant même de partir.
   final DataSaverStore dataSaver;
+
+  /// Ce que le relais Bluetooth laisse passer vers une montre (voir `BleRelay`).
+  final RelayStore relaySettings;
 
   @override
   State<SportsScopeApp> createState() => _SportsScopeAppState();
@@ -164,6 +172,10 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
   /// que pendant la navigation : c'est la coquille de sortie qui l'allume et
   /// l'éteint (`RideShellPage`).
   late final _compass = RiderCompass(phone: _phone);
+
+  /// Le relais vers une montre, au même étage que le hub dont il rediffuse les
+  /// trames : il doit survivre aux allers-retours entre l'accueil et la sortie.
+  late final _relay = BleRelay(hub: _hub, store: widget.relaySettings);
 
   /// Le rattachement des capteurs, au même étage encore : son balayage doit
   /// continuer pendant la sortie, là où un capteur qui décroche est le plus
@@ -378,6 +390,7 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
     _updates.dispose();
     _resume.dispose();
     _linker.dispose();
+    _relay.dispose();
     unawaited(_compass.stop());
     _recorder.dispose();
     _hub.dispose();
@@ -397,6 +410,8 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
         dataSaver: widget.dataSaver,
         hub: _hub,
         linker: _linker,
+        relay: _relay,
+        relaySettings: widget.relaySettings,
         recorder: _recorder,
         compass: _compass,
         rides: widget.rides,
@@ -644,6 +659,8 @@ class HomePage extends StatefulWidget {
     required this.devices,
     required this.hub,
     required this.linker,
+    required this.relay,
+    required this.relaySettings,
     required this.recorder,
     required this.compass,
     required this.rides,
@@ -678,6 +695,8 @@ class HomePage extends StatefulWidget {
   /// Le rattachement des capteurs. Il appartient à l'application : son
   /// balayage doit continuer pendant la sortie, écran empilé par-dessus.
   final DeviceLinker linker;
+  final BleRelay relay;
+  final RelayStore relaySettings;
 
   /// Les itinéraires du compte, pour le sélecteur de navigation.
   final RouteCatalogStore routes;
@@ -734,6 +753,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         devices: _devices,
         hub: _hub,
         linker: widget.linker,
+        relay: widget.relay,
+        relaySettings: widget.relaySettings,
       ),
     ));
   }

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+import '../ble/relay/ble_relay.dart';
+import '../ble/relay/relay_store.dart';
 import '../ble/samples.dart';
 import '../ble/sensor_connection.dart';
 import '../ble/sensor_hub.dart';
@@ -12,6 +14,7 @@ import '../ui/metric_tile.dart' show LiveValuesCard;
 import '../ui/power_calibration_dialog.dart';
 import '../ui/sensor_icons.dart';
 import 'device_linker.dart';
+import 'relay_card.dart';
 import 'known_device.dart';
 import 'known_devices_store.dart';
 import 'sensor_link_status.dart';
@@ -33,6 +36,8 @@ class SensorsPage extends StatefulWidget {
     required this.devices,
     required this.hub,
     required this.linker,
+    required this.relay,
+    required this.relaySettings,
   });
 
   final KnownDevicesStore devices;
@@ -45,6 +50,10 @@ class SensorsPage extends StatefulWidget {
   /// guetteur de trames de publicité, donc un capteur connu vu pendant qu'on
   /// cherche autre chose se rattache sans qu'on ait à le taper.
   final DeviceLinker linker;
+
+  /// Le relais vers une montre et son réglage — voir `RelayCard`.
+  final BleRelay relay;
+  final RelayStore relaySettings;
 
   @override
   State<SensorsPage> createState() => _SensorsPageState();
@@ -228,6 +237,8 @@ class _SensorsPageState extends State<SensorsPage> {
           // Les valeurs en direct vivent ici (elles étaient sur l'accueil) : c'est la page où
           // l'on vérifie qu'un capteur parle — au-dessus de la liste, qu'on lit juste après.
           LiveValuesCard(hub: _hub, drivetrain: Drivetrain.road),
+          const SizedBox(height: 16),
+          RelayCard(relay: widget.relay, settings: widget.relaySettings),
           const SizedBox(height: 16),
           _sectionTitle('Mes capteurs'),
           if (known.isEmpty)
