@@ -26,6 +26,7 @@ import '../phone/phone_sensors.dart';
 import '../phone/remote_keys.dart';
 import '../phone/rider_compass.dart';
 import '../recording/ride_recorder.dart';
+import '../recording/simulated_gps.dart';
 import '../training_program/training_program.dart';
 import '../training_program/training_program_catalog_store.dart';
 import '../training_program/workout_lap_series.dart';
@@ -2150,6 +2151,9 @@ class _RideShellPageState extends State<RideShellPage>
         // Même raison : la page repart de zéro à chaque (re)chargement,
         // y compris le premier — voir NavigationWebController.setDataSaver.
         unawaited(_web?.setDataSaver(widget.dataSaver.enabled) ?? Future.value());
+      case 'sim_fix':
+        // Position du faux GPS de la page de simulation : voir `SimulatedGps`.
+        SimulatedGps.instance.push(message);
       case 'nav':
         _nav.accept(message);
         final climb = _nav.value?.climb;

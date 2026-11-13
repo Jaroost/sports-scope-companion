@@ -42,6 +42,7 @@ import 'ride/ride_shell_page.dart';
 import 'ride/blocks/block_card.dart' show BlockCard;
 import 'recording/gps_source.dart';
 import 'recording/recording_card.dart';
+import 'recording/simulated_gps.dart';
 import 'recording/ride_recorder.dart';
 import 'recording/ride_store.dart';
 import 'recording/rides_sync_card.dart';
@@ -166,7 +167,13 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
   /// sortie commencée sur l'écran des capteurs doit continuer pendant toute la
   /// navigation, et survivre au retour en arrière.
   late final _recorder =
-      RideRecorder(hub: _hub, store: widget.rides, phone: _phone);
+      RideRecorder(
+    hub: _hub,
+    store: widget.rides,
+    phone: _phone,
+    // Le vrai GPS, sauf quand la page de simulation du site prend la main.
+    gps: const SwitchableGpsSource(),
+  );
 
   /// La boussole vit au niveau de l'application comme le hub, mais ne tourne
   /// que pendant la navigation : c'est la coquille de sortie qui l'allume et
@@ -465,6 +472,10 @@ Future<void> openNavigation(
   Future<void> Function()? onHandoffRideEnded,
 }) async {
   if (context == null || !context.mounted) return;
+
+  // Une simulation GPS ne survit pas à la sortie qui l'a lancée : sans cette
+  // remise à zéro, le vrai GPS resterait ignoré pour toutes les suivantes.
+  SimulatedGps.instance.reset();
 
   // Le profil choisi sur le site (modale de la page de partage) prime sur celui
   // déjà retenu dans l'appli : c'est un choix plus frais, fait pour CETTE sortie.

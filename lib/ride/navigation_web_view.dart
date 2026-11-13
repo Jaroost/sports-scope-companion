@@ -13,6 +13,7 @@ import '../navigation/sensor_bridge.dart';
 import '../phone/debug_log.dart';
 import '../phone/rider_compass.dart';
 import '../recording/ride_recorder.dart';
+import '../recording/simulated_gps.dart';
 
 /// La page de navigation du site, et rien d'autre.
 ///
@@ -129,7 +130,9 @@ class NavigationWebController {
       hub: hub,
       compass: compass,
       send: webView.runJavaScript,
-      latestFix: () => recorder.lastFix,
+      // La position simulée prime : hors enregistrement, le recorder n'a
+      // aucun fix, et le trajet parcouru resterait vide pendant la simulation.
+      latestFix: () => SimulatedGps.instance.latest ?? recorder.lastFix,
       rideSessionId: () => recorder.session?.id,
       traveledPath: traveledPath,
     )..start();

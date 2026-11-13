@@ -21,6 +21,8 @@ class NavigationTarget {
     this.autoRecord,
     this.autoDownloadOffline = false,
     this.workoutToken,
+    this.simulate = false,
+    this.simulateFree = false,
   });
 
   /// Partir sans tracé : la carte nue, et rien de ce qui traînait.
@@ -64,6 +66,8 @@ class NavigationTarget {
         autoRecord: autoRecord,
         autoDownloadOffline: autoDownloadOffline,
         workoutToken: workoutToken,
+        simulate: simulate,
+        simulateFree: simulateFree,
       );
 
   /// Reprise du tracé mémorisé par la page, plutôt qu'un départ à neuf. N'a de
@@ -98,11 +102,27 @@ class NavigationTarget {
   /// des trois formes de lien reconnues par [parse].
   final String? workoutToken;
 
+  /// Rejouer l'itinéraire comme **faux GPS** (page de débug du site
+  /// `/routes/:token/simulate`, réservée aux admins) au lieu de lire le vrai
+  /// récepteur. Exige un [shareToken] : le tracé rejoué est celui de l'itinéraire.
+  final bool simulate;
+
+  /// Avec [simulate] : démarrer la navigation **libre** (sans itinéraire chargé)
+  /// pendant que le faux GPS suit quand même le tracé — pour éprouver le suivi
+  /// sans tracé, la devinette de col, etc.
+  final bool simulateFree;
+
+  bool get isSimulated => simulate && shareToken != null;
+
   bool get isFree => shareToken == null;
 
   Uri url({String baseUrl = sportsScopeBaseUrl}) {
     final base = Uri.parse(baseUrl);
-    final path = isFree ? '/navigate' : '/routes/$shareToken/navigate';
+    final path = isFree
+        ? '/navigate'
+        : isSimulated
+            ? '/routes/$shareToken/simulate'
+            : '/routes/$shareToken/navigate';
     final destination = '${base.path}$path'.replaceAll('//', '/');
 
     // `fresh=1` est ce qui distingue les deux `/navigate`. Sans lui, la page
@@ -110,9 +130,10 @@ class NavigationTarget {
     // après un rechargement, et c'était le bug de « Navigation libre », qui
     // rouvrait l'itinéraire de tout à l'heure au lieu de la carte nue.
     final fresh = isFree && !resume;
+    final query = isSimulated && simulateFree ? 'free=1' : (fresh ? 'fresh=1' : null);
 
     if (handoffToken == null) {
-      return base.replace(path: destination, query: fresh ? 'fresh=1' : null);
+      return base.replace(path: destination, query: query);
     }
 
     // Ouvrir la session AVANT la page, et pas après : la navigation lit les
@@ -122,7 +143,7 @@ class NavigationTarget {
       path: '${base.path}/auth/handoff'.replaceAll('//', '/'),
       queryParameters: {
         'token': handoffToken,
-        'next': fresh ? '$destination?fresh=1' : destination,
+        'next': query == null ? destination : '$destination?$query',
       },
     );
   }

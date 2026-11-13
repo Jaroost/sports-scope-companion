@@ -53,6 +53,12 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
   RouteFetchStatus? _status;
   bool _refreshing = false;
 
+  /// Rejouer l'itinéraire choisi comme faux GPS (page de débug du site, admin) —
+  /// voir [NavigationTarget.simulate]. Non mémorisé : on ne veut pas partir en
+  /// simulation par mégarde le jour où l'on roule pour de vrai.
+  bool _simulate = false;
+  bool _simulateFree = false;
+
   /// Le tracé que la page de navigation a laissé derrière elle, lu dans son
   /// stockage au rafraîchissement. Rien en cache ici : voir [RouteCatalogFetch].
   NavSessionSummary? _session;
@@ -97,7 +103,12 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
       }
     }
     if (!mounted) return;
-    _pick(NavigationTarget(shareToken: route.shareToken, label: route.name));
+    _pick(NavigationTarget(
+      shareToken: route.shareToken,
+      label: route.name,
+      simulate: _simulate,
+      simulateFree: _simulate && _simulateFree,
+    ));
   }
 
   /// Changer de profil sans quitter le sélecteur : la feuille de choix se pose
@@ -187,6 +198,7 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
               onTap: () => _pick(const NavigationTarget.free()),
             ),
             const Divider(),
+            _simulationTiles(),
             _header(),
             _notice(),
             if (routes.isEmpty)
@@ -237,6 +249,36 @@ class _NavigationPickerSheetState extends State<NavigationPickerSheet> {
         overflow: TextOverflow.ellipsis,
       ),
       onTap: () => _pick(NavigationTarget.resume(label: session.label)),
+    );
+  }
+
+  /// Les deux interrupteurs de la simulation GPS, au-dessus de la liste : ils
+  /// agissent sur l'itinéraire qu'on touche ensuite. Le faux GPS rejoue ce
+  /// tracé et la page offre ses commandes (lecture, vitesse, écart, perte de
+  /// signal). La page est réservée aux admins du site.
+  Widget _simulationTiles() {
+    return Column(
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          secondary: const Icon(Icons.bug_report_outlined),
+          title: const Text('Simuler le GPS'),
+          subtitle: const Text('Rejoue l\'itinéraire touché comme position'),
+          value: _simulate,
+          onChanged: (v) => setState(() => _simulate = v),
+        ),
+        if (_simulate)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            secondary: const Icon(Icons.explore_outlined),
+            title: const Text('En navigation libre'),
+            subtitle: const Text('Sans itinéraire chargé, le faux GPS suit le tracé'),
+            value: _simulateFree,
+            onChanged: (v) => setState(() => _simulateFree = v),
+          ),
+      ],
     );
   }
 
