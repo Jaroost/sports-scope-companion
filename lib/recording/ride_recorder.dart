@@ -776,6 +776,16 @@ class RideRecorder extends ChangeNotifier {
       case WheelSpeedSample(:final revolutionsPerSecond):
         _wheelSpeedMps = revolutionsPerSecond * drivetrain.wheelCircumference;
         _wheelSpeedAt = sample.at;
+      case SpeedSample(:final metersPerSecond):
+        // Même repli que la vitesse de roue : `RideStats` ne le lit que quand le
+        // GPS n'a pas de vitesse, donc sur un rouleau c'est ce qui donne une
+        // distance au .fit, comme le ferait un capteur de vitesse.
+        _wheelSpeedMps = metersPerSecond;
+        _wheelSpeedAt = sample.at;
+      case ResistanceSample():
+        // Un réglage de la machine, pas une mesure de l'effort : la puissance
+        // dit déjà ce que la résistance a coûté.
+        break;
       case GearSample(:final gears):
         _gearFront = gears.frontPosition;
         _gearRear = gears.rearPosition;

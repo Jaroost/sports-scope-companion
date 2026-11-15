@@ -15,6 +15,7 @@ import 'account/threshold_gap.dart';
 import 'ble/relay/ble_relay.dart';
 import 'ble/relay/relay_store.dart';
 import 'ble/sensor_hub.dart';
+import 'ble/trainer_calibration_store.dart';
 import 'dashboard/companion_settings_fetch.dart';
 import 'dashboard/companion_settings_store.dart';
 import 'dashboard/preset_picker.dart';
@@ -90,7 +91,9 @@ Future<void> main() async {
   // plutôt que de retomber sur « désactivée » jusqu'au premier changement.
   final dataSaver = await DataSaverStore.open();
   final relaySettings = await RelayStore.open();
+  final trainerCalibration = await TrainerCalibrationStore.open();
   runApp(SportsScopeApp(
+    trainerCalibration: trainerCalibration,
     relaySettings: relaySettings,
     devices: devices,
     rides: rides,
@@ -117,7 +120,13 @@ class SportsScopeApp extends StatefulWidget {
     required this.settings,
     required this.dataSaver,
     required this.relaySettings,
+    required this.trainerCalibration,
   });
+
+  /// Les relevés qui corrigent la puissance d'un vélo d'appartement — voir
+  /// `TrainerPowerModel`. Au niveau de l'application : le hub les lit à chaque
+  /// trame, quel que soit l'écran ouvert.
+  final TrainerCalibrationStore trainerCalibration;
 
   final KnownDevicesStore devices;
   final RideStore rides;
@@ -156,6 +165,7 @@ class _SportsScopeAppState extends State<SportsScopeApp> {
   /// ouvrir la navigation sans repasser par la page des capteurs.
   late final _hub = SensorHub(
     primaryHeartRateOf: () => widget.devices.primaryHeartRateId,
+    trainerCalibration: widget.trainerCalibration,
   );
 
   /// Les capteurs du téléphone lui-même : baromètre (dénivelé), luminosité

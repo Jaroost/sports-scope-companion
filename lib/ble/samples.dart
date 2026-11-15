@@ -49,6 +49,27 @@ class WheelSpeedSample extends SensorSample {
       revolutionsPerSecond * wheelCircumference;
 }
 
+/// Vitesse instantanée donnée **telle quelle** par la machine (FTMS), en m/s.
+///
+/// Distincte de [WheelSpeedSample] : celle-là est un nombre de tours de roue
+/// qui attend une circonférence, alors qu'un home-trainer publie une vitesse
+/// déjà calculée — virtuelle, puisque la roue n'avance pas.
+class SpeedSample extends SensorSample {
+  const SpeedSample(super.at, this.metersPerSecond);
+
+  final double metersPerSecond;
+}
+
+/// Le niveau de résistance de la machine (FTMS, Indoor Bike Data).
+///
+/// Un niveau, pas une grandeur physique : il n'a de sens que pour la machine
+/// qui l'émet. Seule la puissance se compare d'un vélo à l'autre.
+class ResistanceSample extends SensorSample {
+  const ResistanceSample(super.at, this.level);
+
+  final int level;
+}
+
 class GearSample extends SensorSample {
   const GearSample(super.at, this.gears);
 

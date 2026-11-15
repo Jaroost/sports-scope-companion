@@ -6,6 +6,7 @@ import 'decoders/cycling_power.dart';
 import 'decoders/di2.dart';
 import 'decoders/di2_buttons.dart';
 import 'decoders/heart_rate.dart';
+import 'decoders/indoor_bike.dart';
 import 'decoders/varia.dart';
 import 'samples.dart';
 import 'sensor_uuids.dart';
@@ -74,6 +75,17 @@ class CscCharacteristic extends CharacteristicDecoder {
 
   @override
   void reset() => _decoder.reset();
+}
+
+class IndoorBikeCharacteristic extends CharacteristicDecoder {
+  final _decoder = IndoorBikeDecoder();
+
+  @override
+  Guid get characteristic => BleCharacteristics.indoorBikeData;
+
+  @override
+  List<SensorSample> decode(List<int> data, DateTime at) =>
+      _decoder.decode(data, at: at);
 }
 
 class Di2Characteristic extends CharacteristicDecoder {

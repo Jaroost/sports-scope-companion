@@ -12,6 +12,7 @@ import '../ble/sensor_profile.dart';
 import '../drivetrain.dart';
 import '../ui/metric_tile.dart' show LiveValuesCard;
 import '../ui/power_calibration_dialog.dart';
+import '../ui/trainer_calibration_page.dart';
 import '../ui/sensor_icons.dart';
 import 'device_linker.dart';
 import 'relay_card.dart';
@@ -340,6 +341,17 @@ class _SensorsPageState extends State<SensorsPage> {
                 );
               case 'calibrate':
                 showPowerCalibrationFor(context, connection);
+              case 'trainer':
+                final store = _hub.trainerCalibration;
+                if (store == null) break;
+                Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => TrainerCalibrationPage(
+                    hub: _hub,
+                    store: store,
+                    deviceId: known.remoteId,
+                    deviceName: known.name,
+                  ),
+                ));
             }
           }),
           itemBuilder: (context) => [
@@ -353,6 +365,11 @@ class _SensorsPageState extends State<SensorsPage> {
                 status == SensorStatus.connected)
               const PopupMenuItem(
                   value: 'calibrate', child: Text('Calibrer la puissance')),
+            // La résistance n'existe qu'en FTMS : sans elle, rien à relever.
+            if (known.kinds.contains(SensorKind.trainer) &&
+                _hub.trainerCalibration != null)
+              const PopupMenuItem(
+                  value: 'trainer', child: Text('Calibrer la puissance (vélo)')),
             const PopupMenuItem(value: 'rename', child: Text('Renommer')),
             // Seulement sur ce qui mesure le cardio : sur un radar, la commande
             // ne voudrait rien dire.

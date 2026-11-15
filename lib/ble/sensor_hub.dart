@@ -8,6 +8,7 @@ import 'primary_source_gate.dart';
 import 'samples.dart';
 import 'sensor_connection.dart';
 import 'sensor_profile.dart';
+import 'trainer_calibration_store.dart';
 
 /// Agrège plusieurs capteurs en un seul flux d'échantillons.
 ///
@@ -16,8 +17,14 @@ import 'sensor_profile.dart';
 /// *avant* que l'UI ne lise [latest…] — un crash ne doit jamais coûter une
 /// sortie.
 class SensorHub {
-  SensorHub({String? Function()? primaryHeartRateOf})
-      : _primaryHeartRateOf = primaryHeartRateOf ?? (() => null);
+  SensorHub({
+    String? Function()? primaryHeartRateOf,
+    this.trainerCalibration,
+  }) : _primaryHeartRateOf = primaryHeartRateOf ?? (() => null);
+
+  /// Les relevés qui corrigent la puissance d'un vélo d'appartement imprécis
+  /// (`null` : aucune correction, comme avant).
+  final TrainerCalibrationStore? trainerCalibration;
 
   /// L'appareil désigné « cardio principal » (`KnownDevice.primaryHeartRate`).
   /// Une fonction et non une valeur : il se choisit sur la page des capteurs,
@@ -41,6 +48,12 @@ class SensorHub {
   final latestCadence = ValueNotifier<double?>(null);
   final latestGears = ValueNotifier<Di2Gears?>(null);
 
+  /// Vitesse (m/s) et niveau de résistance donnés par un home-trainer FTMS.
+  /// Même péremption que les autres mesures : une machine qui s'arrête ne doit
+  /// pas laisser un niveau figé à l'écran.
+  final latestTrainerSpeedMps = ValueNotifier<double?>(null);
+  final latestResistance = ValueNotifier<int?>(null);
+
   /// Au-delà, une mesure affichée est retirée (`—` à l'écran). Sans ça, le hub
   /// gardait la dernière valeur d'un capteur muet — montre qui a cessé de
   /// diffuser, ceinture qui glisse — et un pouls figé se lisait comme du
@@ -54,6 +67,8 @@ class SensorHub {
   DateTime? _heartRateAt;
   DateTime? _powerAt;
   DateTime? _cadenceAt;
+  DateTime? _trainerSpeedAt;
+  DateTime? _resistanceAt;
 
   /// Dernier état du radar. `null` = pas de radar connecté ; un [RadarSample]
   /// vide = route dégagée. La distinction compte : on n'affiche pas la même
@@ -106,7 +121,30 @@ class SensorHub {
     return connection;
   }
 
-  void _onSample(SensorConnection source, SensorSample sample) {
+  /// Remplace les watts d'un vélo d'appartement par l'estimation tirée de son
+  /// niveau de résistance et de la cadence, si le cycliste l'a calibré et
+  /// activé. Appliqué ici, **avant** `_samples` : l'enregistreur, le pont et
+  /// l'écran voient tous la même puissance — pas seulement `latestPower`.
+  ///
+  /// On ne devine jamais : sans niveau de résistance ni cadence récents, la
+  /// mesure du vélo passe telle quelle. Les trames brutes (donc le relais vers
+  /// une montre) ne sont, elles, **pas** corrigées.
+  SensorSample _calibrated(SensorConnection source, SensorSample sample) {
+    if (sample is! PowerSample) return sample;
+    final model =
+        trainerCalibration?.modelFor(source.device.remoteId.str);
+    final resistance = latestResistance.value;
+    final cadence = latestCadence.value;
+    if (model == null || resistance == null || cadence == null) return sample;
+
+    final watts = model.estimate(resistance: resistance, cadence: cadence);
+    if (watts == null) return sample;
+    return PowerSample(sample.at, watts.round(),
+        balanceLeftPercent: sample.balanceLeftPercent);
+  }
+
+  void _onSample(SensorConnection source, SensorSample rawSample) {
+    final sample = _calibrated(source, rawSample);
     // Filtré ici, avant `_samples` : l'enregistreur et le pont lisent ce flux,
     // pas `latestHeartRate`, et la relève doit valoir pour eux aussi. Les
     // trames brutes, elles, passent toutes — c'est l'outil de diagnostic.
@@ -132,6 +170,14 @@ class SensorHub {
       case CadenceSample(:final rpm):
         latestCadence.value = rpm;
         _cadenceAt = DateTime.now();
+        _armExpiry();
+      case SpeedSample(:final metersPerSecond):
+        latestTrainerSpeedMps.value = metersPerSecond;
+        _trainerSpeedAt = DateTime.now();
+        _armExpiry();
+      case ResistanceSample(:final level):
+        latestResistance.value = level;
+        _resistanceAt = DateTime.now();
         _armExpiry();
       case GearSample(:final gears):
         latestGears.value = gears;
@@ -165,7 +211,19 @@ class SensorHub {
         latestCadence.value = null;
         _cadenceAt = null;
       }
-      if (_heartRateAt == null && _powerAt == null && _cadenceAt == null) {
+      if (_expired(_trainerSpeedAt, now)) {
+        latestTrainerSpeedMps.value = null;
+        _trainerSpeedAt = null;
+      }
+      if (_expired(_resistanceAt, now)) {
+        latestResistance.value = null;
+        _resistanceAt = null;
+      }
+      if (_heartRateAt == null &&
+          _powerAt == null &&
+          _cadenceAt == null &&
+          _trainerSpeedAt == null &&
+          _resistanceAt == null) {
         _expiryTimer?.cancel();
         _expiryTimer = null;
       }

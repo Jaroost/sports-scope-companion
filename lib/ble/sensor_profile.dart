@@ -8,7 +8,7 @@ import 'sensor_uuids.dart';
 /// C'est la granularité utile partout ailleurs : un même boîtier peut porter
 /// plusieurs profils (un capteur de puissance publie souvent la cadence), et
 /// c'est ce qu'on retient d'un appareil connu — pas son modèle commercial.
-enum SensorKind { heartRate, power, speedCadence, gears, radar, battery }
+enum SensorKind { heartRate, power, speedCadence, trainer, gears, radar, battery }
 
 /// Un profil relie une capacité à ce qu'il faut lire en GATT pour l'obtenir.
 ///
@@ -59,6 +59,16 @@ final sensorProfiles = <SensorProfile>[
     service: BleServices.cyclingSpeedCadence,
     characteristic: BleCharacteristics.cscMeasurement,
     decoder: CscCharacteristic.new,
+  ),
+  // FTMS : vitesse et résistance d'un home-trainer / vélo d'appartement. Le
+  // paquet porte aussi puissance, cadence et cardio, que le décodeur laisse
+  // aux profils CPS et cardio — voir `decoders/indoor_bike.dart`.
+  SensorProfile(
+    kind: SensorKind.trainer,
+    label: 'Home-trainer',
+    service: BleServices.fitnessMachine,
+    characteristic: BleCharacteristics.indoorBikeData,
+    decoder: IndoorBikeCharacteristic.new,
   ),
   SensorProfile(
     kind: SensorKind.gears,

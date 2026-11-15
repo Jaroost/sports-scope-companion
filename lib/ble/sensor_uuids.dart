@@ -31,6 +31,9 @@ class BleServices {
   static final cyclingPower = Guid(uuid128(0x1818));
   static final cyclingSpeedCadence = Guid(uuid128(0x1816));
   static final battery = Guid(uuid128(0x180F));
+
+  /// Fitness Machine Service (FTMS) : home-trainers et vélos d'appartement.
+  static final fitnessMachine = Guid(uuid128(0x1826));
   static final deviceInformation = Guid(uuid128(0x180A));
 
   /// Service propriétaire Di2 12 vitesses.
@@ -45,6 +48,10 @@ class BleCharacteristics {
   static final heartRateMeasurement = Guid(uuid128(0x2A37));
   static final cyclingPowerMeasurement = Guid(uuid128(0x2A63));
   static final cscMeasurement = Guid(uuid128(0x2A5B));
+
+  /// Indoor Bike Data (FTMS) — lecture seule : l'appli n'écrit pas dans le
+  /// Fitness Machine Control Point, elle ne pilote pas la résistance.
+  static final indoorBikeData = Guid(uuid128(0x2AD2));
 
   /// Cycling Power Control Point : le seul canal où l'appli *écrit*. Il porte
   /// la calibration (compensation d'offset) — voir `power_calibration.dart`.

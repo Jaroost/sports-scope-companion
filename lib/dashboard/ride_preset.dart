@@ -1516,6 +1516,7 @@ class SensorSettings {
     this.heartRate = true,
     this.cadence = true,
     this.gears = true,
+    this.trainer = true,
   });
 
   final bool gps;
@@ -1528,6 +1529,9 @@ class SensorSettings {
   final bool cadence;
   final bool gears;
 
+  /// Vitesse et résistance d'un home-trainer FTMS.
+  final bool trainer;
+
   /// Ce profil accepte-t-il cette capacité BLE ?
   ///
   /// **Ne peut que restreindre.** L'appelant garde son propre filtre — le
@@ -1538,6 +1542,7 @@ class SensorSettings {
         SensorKind.heartRate => heartRate,
         SensorKind.power => power,
         SensorKind.speedCadence => cadence,
+        SensorKind.trainer => trainer,
         SensorKind.gears => gears,
         SensorKind.radar => radar,
         // Jamais réglable, jamais un motif de rattachement ou d'écart à elle
@@ -1563,6 +1568,7 @@ class SensorSettings {
       heartRate: on('heart_rate'),
       cadence: on('cadence'),
       gears: on('gears'),
+      trainer: on('trainer'),
     );
   }
 }

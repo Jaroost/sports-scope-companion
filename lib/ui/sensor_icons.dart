@@ -13,6 +13,7 @@ IconData iconFor(SensorKind kind) => switch (kind) {
       SensorKind.heartRate => Icons.favorite,
       SensorKind.power => Icons.bolt,
       SensorKind.speedCadence => Icons.autorenew,
+      SensorKind.trainer => Icons.directions_bike,
       SensorKind.gears => Icons.settings,
       SensorKind.radar => Icons.radar,
       SensorKind.battery => Icons.battery_full,

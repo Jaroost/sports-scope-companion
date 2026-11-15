@@ -1113,6 +1113,46 @@ Le décodeur implémente `CharacteristicDecoder` (`lib/ble/characteristic_decode
 - `reset()` remet à zéro l'état cumulé après une reconnexion, sinon un delta
   calculé à cheval sort une cadence absurde.
 
+### Home-trainer FTMS (`SensorKind.trainer`)
+
+`decoders/indoor_bike.dart` lit *Indoor Bike Data* (0x2AD2, service 0x1826) et ne
+sort que **la vitesse** (`SpeedSample`, en m/s — la spec la donne en 0,01 km/h) et
+**le niveau de résistance** (`ResistanceSample`, sans unité : propre à la
+machine). Le paquet porte aussi puissance, cadence et cardio, **volontairement
+ignorés** : un vélo FTMS expose presque toujours Cycling Power en plus, et deux
+sources pour une mesure feraient écrire le hub à tour de rôle. Les champs sont
+sautés à leur taille pour que la résistance tombe juste. Le bit 0 des drapeaux est
+**inversé** (« More Data ») : la vitesse est présente quand il vaut 0.
+
+- Lecture seule : le Fitness Machine Control Point n'est jamais écrit.
+- Le hub expose `latestTrainerSpeedMps` et `latestResistance`, périmés à 8 s.
+- La vitesse FTMS alimente `_wheelSpeedMps` de l'enregistreur : sur un rouleau sans
+  GPS, c'est elle qui donne sa distance au `.fit` (repli de `RideStats`).
+- Le réglage `sensors.trainer` d'un profil de sortie coupe la capacité (absent =
+  activé). Aucun composant du tableau de bord n'affiche encore ces deux valeurs.
+
+### Corriger la puissance d'un vélo d'appartement imprécis
+
+Menu d'une ligne de la page Capteurs → « Calibrer la puissance (vélo) »
+(`ui/trainer_calibration_page.dart`, seulement si l'appareil a la capacité
+`trainer`). Le cycliste règle un niveau, pédale à cadence stable, entre la
+puissance d'une référence : un relevé `(résistance, cadence, watts)`.
+`TrainerPowerModel` (`ble/trainer_power_model.dart`, pur) en tire la puissance :
+
+- **par niveau, `P = a·cadence^b`** ; avec ≥ 2 relevés l'exposant est ajusté
+  (log-log, borné à 0,5–3), avec un seul on **suppose** `b = 1` — une hypothèse,
+  pas une mesure ;
+- **entre deux niveaux, interpolation linéaire** ; **hors plage, on reste sur le
+  niveau le plus proche**, jamais d'extrapolation ;
+- cadence nulle ⇒ 0 W.
+
+`SensorHub._calibrated` remplace les watts **avant** `_samples` (enregistreur,
+pont et écran voient la même valeur). Il ne devine jamais : sans résistance ni
+cadence récentes, ou si la correction est coupée (défaut), la mesure du vélo
+passe telle quelle. **Les trames brutes — donc le relais vers une montre — ne
+sont pas corrigées.** Persistance : `trainer_calibration.json`, par appareil
+(`TrainerCalibrationStore`).
+
 ## Enregistrement et persistance
 
 Tout est en fichiers dans le dossier applicatif, réécrits en entier via un
