@@ -8,7 +8,15 @@ import 'sensor_uuids.dart';
 /// C'est la granularité utile partout ailleurs : un même boîtier peut porter
 /// plusieurs profils (un capteur de puissance publie souvent la cadence), et
 /// c'est ce qu'on retient d'un appareil connu — pas son modèle commercial.
-enum SensorKind { heartRate, power, speedCadence, trainer, gears, radar, battery }
+enum SensorKind {
+  heartRate,
+  power,
+  speedCadence,
+  trainer,
+  gears,
+  radar,
+  battery,
+}
 
 /// Un profil relie une capacité à ce qu'il faut lire en GATT pour l'obtenir.
 ///
@@ -157,6 +165,18 @@ List<CharacteristicDecoder> decodersFor(Iterable<SensorKind> kinds) {
   final wanted = kinds.toSet();
   return [
     for (final profile in sensorProfiles)
-      if (wanted.contains(profile.kind)) profile.decoder(),
+      if (wanted.contains(profile.kind))
+        // Les watts et la cadence du paquet FTMS ne servent qu'à un appareil
+        // qui n'a pas son propre profil pour eux : sinon deux sources
+        // écriraient la même mesure à tour de rôle dans le hub.
+        if (profile.kind == SensorKind.trainer)
+          IndoorBikeCharacteristic(
+            includePower: !wanted.contains(SensorKind.power),
+            includeCadence:
+                !wanted.contains(SensorKind.speedCadence) &&
+                !wanted.contains(SensorKind.power),
+          )
+        else
+          profile.decoder(),
   ];
 }

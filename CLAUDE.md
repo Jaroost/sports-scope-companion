@@ -1118,9 +1118,11 @@ Le décodeur implémente `CharacteristicDecoder` (`lib/ble/characteristic_decode
 `decoders/indoor_bike.dart` lit *Indoor Bike Data* (0x2AD2, service 0x1826) et ne
 sort que **la vitesse** (`SpeedSample`, en m/s — la spec la donne en 0,01 km/h) et
 **le niveau de résistance** (`ResistanceSample`, sans unité : propre à la
-machine). Le paquet porte aussi puissance, cadence et cardio, **volontairement
-ignorés** : un vélo FTMS expose presque toujours Cycling Power en plus, et deux
-sources pour une mesure feraient écrire le hub à tour de rôle. Les champs sont
+machine). Le paquet porte aussi puissance et cadence : lues **seulement si
+l'appareil n'a pas son propre profil pour elles** (`decodersFor` : pas de Cycling
+Power ⇒ les watts FTMS, pas de Cycling Power ni CSC ⇒ la cadence FTMS). Un vélo qui
+expose les deux verrait sinon le hub écrit à tour de rôle par deux sources ; un
+vélo qui n'a *que* FTMS n'aurait sinon aucun watt, donc aucune zone. Les champs sont
 sautés à leur taille pour que la résistance tombe juste. Le bit 0 des drapeaux est
 **inversé** (« More Data ») : la vitesse est présente quand il vaut 0.
 

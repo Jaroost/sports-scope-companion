@@ -78,7 +78,15 @@ class CscCharacteristic extends CharacteristicDecoder {
 }
 
 class IndoorBikeCharacteristic extends CharacteristicDecoder {
-  final _decoder = IndoorBikeDecoder();
+  IndoorBikeCharacteristic({
+    bool includePower = false,
+    bool includeCadence = false,
+  }) : _decoder = IndoorBikeDecoder(
+         includePower: includePower,
+         includeCadence: includeCadence,
+       );
+
+  final IndoorBikeDecoder _decoder;
 
   @override
   Guid get characteristic => BleCharacteristics.indoorBikeData;
@@ -110,16 +118,16 @@ class Di2ButtonsCharacteristic extends CharacteristicDecoder {
 
   @override
   List<SensorSample> decode(List<int> data, DateTime at) => [
-        for (final press in _channels.update(data))
-          // L'énumération est dans le même ordre que la numérotation des
-          // canaux (1..4) : `values[channel - 1]` évite un `switch` qui ne
-          // dirait rien de plus.
-          RemoteButtonSample(
-            at,
-            Di2ButtonChannel.values[press.channel - 1],
-            press.kind,
-          ),
-      ];
+    for (final press in _channels.update(data))
+      // L'énumération est dans le même ordre que la numérotation des
+      // canaux (1..4) : `values[channel - 1]` évite un `switch` qui ne
+      // dirait rien de plus.
+      RemoteButtonSample(
+        at,
+        Di2ButtonChannel.values[press.channel - 1],
+        press.kind,
+      ),
+  ];
 
   @override
   void reset() => _channels.reset();

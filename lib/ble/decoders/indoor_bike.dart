@@ -10,19 +10,26 @@ import '../samples.dart';
 /// vaut **0**. Un bit 0 posé veut dire que la trame est un fragment sans
 /// vitesse, la suite d'une trame trop longue pour un seul paquet.
 ///
-/// On ne décode que **la vitesse et la résistance**. Le même paquet porte aussi
-/// puissance, cadence et cardio, volontairement ignorés : un vélo qui expose
-/// FTMS expose presque toujours aussi Cycling Power, et deux sources pour la
-/// même mesure feraient écrire le hub à tour de rôle. Les champs sont tout de
-/// même *sautés* à la bonne taille, sinon la résistance serait lue au mauvais
-/// endroit.
+/// On décode toujours **la vitesse et la résistance**. Le même paquet porte aussi
+/// puissance et cadence, que l'appelant demande ou non (`includePower`,
+/// `includeCadence`) : un vélo qui expose FTMS expose souvent aussi Cycling
+/// Power, et deux sources pour la même mesure feraient écrire le hub à tour de
+/// rôle — mais un vélo d'appartement qui n'a *que* FTMS n'aurait alors aucun
+/// watt, donc aucune zone de puissance. Les champs sont de toute façon *sautés*
+/// à la bonne taille, sinon la suite serait lue au mauvais endroit.
 class IndoorBikeDecoder {
+  IndoorBikeDecoder({this.includePower = false, this.includeCadence = false});
+
+  final bool includePower;
+  final bool includeCadence;
+
   static const _moreData = 1 << 0;
   static const _averageSpeed = 1 << 1;
   static const _instantCadence = 1 << 2;
   static const _averageCadence = 1 << 3;
   static const _totalDistance = 1 << 4;
   static const _resistance = 1 << 5;
+  static const _instantPower = 1 << 6;
 
   List<SensorSample> decode(List<int> data, {DateTime? at}) {
     if (data.length < 2) return const [];
@@ -43,7 +50,13 @@ class IndoorBikeDecoder {
     }
 
     if (flags & _averageSpeed != 0) offset += 2;
-    if (flags & _instantCadence != 0) offset += 2;
+    if (flags & _instantCadence != 0) {
+      if (data.length < offset + 2) return samples;
+      // Unité : 0,5 tr/min.
+      final raw = bytes.getUint16(offset, Endian.little);
+      offset += 2;
+      if (includeCadence) samples.add(CadenceSample(now, raw / 2));
+    }
     if (flags & _averageCadence != 0) offset += 2;
     if (flags & _totalDistance != 0) offset += 3;
 
@@ -52,6 +65,15 @@ class IndoorBikeDecoder {
       // Niveau propre à la machine, sans unité : un 12 sur un vélo ne vaut pas
       // un 12 sur un autre. Signé, comme la spec le déclare.
       samples.add(ResistanceSample(now, bytes.getInt16(offset, Endian.little)));
+      offset += 2;
+    }
+
+    if (flags & _instantPower != 0) {
+      if (data.length < offset + 2) return samples;
+      // Signée, comme pour Cycling Power.
+      if (includePower) {
+        samples.add(PowerSample(now, bytes.getInt16(offset, Endian.little)));
+      }
     }
 
     return samples;
