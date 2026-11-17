@@ -103,19 +103,50 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
         val gatt = manager.openGattServer(context, callback) ?: return "Serveur Bluetooth indisponible"
         server = gatt
 
-        val services = ArrayList<UUID>()
-        if ("heartRate" in kinds) services += addHeartRate(gatt)
-        if ("power" in kinds) services += addPower(gatt)
-        if ("speedCadence" in kinds) services += addCsc(gatt)
+        val services = ArrayList<BluetoothGattService>()
+        if ("heartRate" in kinds) services += addHeartRate()
+        if ("power" in kinds) services += addPower()
+        if ("speedCadence" in kinds) services += addCsc()
         if (services.isEmpty()) {
             stop()
             return "Aucune information à relayer"
         }
 
-        // Annonce : drapeaux + liste des services (≤ 3 × 2 octets, loin de la
-        // limite de 31 octets). Le nom, lui, va dans la réponse au scan.
+        // Android n'accepte qu'un `addService` à la fois : un second appel avant
+        // `onServiceAdded` est refusé en silence. L'annonce promettait alors un
+        // service absent, et la montre, qui voyait le capteur, échouait à s'y
+        // connecter. On les pose donc un par un, et on n'annonce qu'à la fin.
+        pending.clear()
+        pending.addAll(services)
+        pendingAdvertiser = advertiser
+        addNextService()
+        return null
+    }
+
+    private val pending = ArrayDeque<BluetoothGattService>()
+    private var pendingAdvertiser: android.bluetooth.le.BluetoothLeAdvertiser? = null
+    private val announced = ArrayList<UUID>()
+
+    private fun addNextService() {
+        val gatt = server ?: return
+        val next = pending.removeFirstOrNull()
+        if (next == null) {
+            startAdvertising()
+            return
+        }
+        if (!gatt.addService(next)) {
+            // Refusé d'emblée : ne pas l'annoncer, mais ne pas bloquer les autres.
+            addNextService()
+        }
+    }
+
+    private fun startAdvertising() {
+        val advertiser = pendingAdvertiser ?: return
+        if (announced.isEmpty()) return
+        // Drapeaux + liste des services (≤ 3 × 2 octets, loin de la limite de
+        // 31 octets). Le nom, lui, va dans la réponse au scan.
         val data = AdvertiseData.Builder().setIncludeDeviceName(false).apply {
-            services.forEach { addServiceUuid(ParcelUuid(it)) }
+            announced.forEach { addServiceUuid(ParcelUuid(it)) }
         }.build()
         val scanResponse = AdvertiseData.Builder().setIncludeDeviceName(true).build()
         val settings = AdvertiseSettings.Builder()
@@ -125,10 +156,11 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
             .build()
         advertiser.startAdvertising(settings, data, scanResponse, advertiseCallback)
         advertising = true
-        return null
     }
 
     private fun stop() {
+        pending.clear()
+        announced.clear()
         if (advertising) {
             manager.adapter?.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
             advertising = false
@@ -163,17 +195,16 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
 
     // --- Services ---------------------------------------------------------
 
-    private fun addHeartRate(gatt: BluetoothGattServer): UUID {
+    private fun addHeartRate(): BluetoothGattService {
         val service = BluetoothGattService(sig(0x180D), BluetoothGattService.SERVICE_TYPE_PRIMARY)
         service.addCharacteristic(measurement(0x2A37))
         // Position du capteur : 1 = poitrine. Facultative, mais certaines montres
         // la lisent avant de s'abonner.
         service.addCharacteristic(readOnly(0x2A38, byteArrayOf(1)))
-        gatt.addService(service)
-        return service.uuid
+        return service
     }
 
-    private fun addPower(gatt: BluetoothGattServer): UUID {
+    private fun addPower(): BluetoothGattService {
         val service = BluetoothGattService(sig(0x1818), BluetoothGattService.SERVICE_TYPE_PRIMARY)
         service.addCharacteristic(measurement(0x2A63))
         // Fonctionnalités : équilibre (bit 0), couple cumulé (1), roue (2),
@@ -182,17 +213,15 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
         service.addCharacteristic(readOnly(0x2A65, byteArrayOf(0x0F, 0, 0, 0)))
         // Position du capteur : 5 = pédalier... valeur « autre » (0) par prudence.
         service.addCharacteristic(readOnly(0x2A5D, byteArrayOf(0)))
-        gatt.addService(service)
-        return service.uuid
+        return service
     }
 
-    private fun addCsc(gatt: BluetoothGattServer): UUID {
+    private fun addCsc(): BluetoothGattService {
         val service = BluetoothGattService(sig(0x1816), BluetoothGattService.SERVICE_TYPE_PRIMARY)
         service.addCharacteristic(measurement(0x2A5B))
         // Roue (bit 0) et manivelle (bit 1).
         service.addCharacteristic(readOnly(0x2A5C, byteArrayOf(0x03, 0)))
-        gatt.addService(service)
-        return service.uuid
+        return service
     }
 
     private fun measurement(short: Int): BluetoothGattCharacteristic {
@@ -225,6 +254,13 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
     // --- Callbacks --------------------------------------------------------
 
     private val callback = object : BluetoothGattServerCallback() {
+        override fun onServiceAdded(status: Int, service: BluetoothGattService) {
+            main.post {
+                if (status == BluetoothGatt.GATT_SUCCESS) announced += service.uuid
+                addNextService()
+            }
+        }
+
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 subscribed.values.forEach { it.remove(device) }

@@ -138,6 +138,11 @@ class SensorHub {
     return connection;
   }
 
+  /// Posé par le mode apprentissage de la calibration : il doit lire les watts
+  /// **bruts** du vélo, sinon une calibration déjà active lui ferait apprendre
+  /// sa propre estimation et la courbe se mordrait la queue.
+  bool bypassCalibration = false;
+
   /// Remplace les watts d'un vélo d'appartement par l'estimation tirée de son
   /// niveau de résistance et de la cadence, si le cycliste l'a calibré et
   /// activé. Appliqué ici, **avant** `_samples` : l'enregistreur, le pont et
@@ -147,7 +152,7 @@ class SensorHub {
   /// mesure du vélo passe telle quelle. Les trames brutes (donc le relais vers
   /// une montre) ne sont, elles, **pas** corrigées.
   SensorSample _calibrated(SensorConnection source, SensorSample sample) {
-    if (sample is! PowerSample) return sample;
+    if (sample is! PowerSample || bypassCalibration) return sample;
     final model =
         trainerCalibration?.modelFor(source.device.remoteId.str);
     // Un vélo sans FTMS ne publie pas son niveau de frein : le cycliste le dit à
