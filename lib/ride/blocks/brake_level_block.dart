@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ble/sensor_hub.dart';
 import '../../dashboard/dashboard_block.dart';
@@ -30,6 +31,10 @@ class BrakeLevelControl extends StatelessWidget {
   /// La largeur à laquelle le bloc se construit avant mise à l'échelle
   /// (`ScaleToFit` la ramène à la case), comme [DashboardActionButton].
   static const _fullWidth = 200.0;
+
+  /// Distance du glissé, comme sur le minuteur (`_SwipeControls`) : voulu, mais
+  /// on le fait au guidon.
+  static const _swipeThreshold = 50.0;
 
   @override
   Widget build(BuildContext context) {
@@ -101,16 +106,71 @@ class BrakeLevelControl extends StatelessWidget {
           ],
         );
 
-        return BlockSurface(
-          background: color,
-          child: compact
-              ? row
-              : SizedBox(
-                  width: _fullWidth,
-                  child: Center(child: row),
-                ),
+        return _Swipe(
+          threshold: _swipeThreshold,
+          // Vers la gauche on réduit, vers la droite on augmente : même sens
+          // que le minuteur, où la droite « remet à zéro ».
+          onLeft: level == null ? null : () => change(-1),
+          onRight: level == null ? null : () => change(1),
+          child: BlockSurface(
+            background: color,
+            child: compact
+                ? row
+                : SizedBox(
+                    width: _fullWidth,
+                    child: Center(child: row),
+                  ),
+          ),
         );
       },
     );
   }
+}
+
+/// Glissé horizontal : un cran par geste, au-delà de [threshold].
+///
+/// Le détecteur de glissé horizontal gagne l'arène contre le `PageView` pour
+/// tout glissé commencé sur le composant : la page ne change donc pas. Sans
+/// vélo (`null`), le glissé est sans effet mais reste absorbé, pour ne pas
+/// faire défiler la page sous le doigt.
+class _Swipe extends StatefulWidget {
+  const _Swipe({
+    required this.threshold,
+    required this.onLeft,
+    required this.onRight,
+    required this.child,
+  });
+
+  final double threshold;
+  final VoidCallback? onLeft;
+  final VoidCallback? onRight;
+  final Widget child;
+
+  @override
+  State<_Swipe> createState() => _SwipeState();
+}
+
+class _SwipeState extends State<_Swipe> {
+  double _travelled = 0;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onHorizontalDragStart: (_) => _travelled = 0,
+    onHorizontalDragUpdate: (d) => _travelled += d.primaryDelta ?? 0,
+    onHorizontalDragEnd: (_) {
+      final travelled = _travelled;
+      _travelled = 0;
+      final action = travelled <= -widget.threshold
+          ? widget.onLeft
+          : travelled >= widget.threshold
+          ? widget.onRight
+          : null;
+      if (action == null) return;
+      HapticFeedback.mediumImpact();
+      action();
+    },
+    onHorizontalDragCancel: () => _travelled = 0,
+    child: widget.child,
+  );
 }

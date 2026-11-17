@@ -1159,7 +1159,8 @@ jour après un coup de molette fausse les watts : c'est une limite assumée.
 
 Le composant `brake_level` (`BrakeLevelBlock`, `ride/blocks/brake_level_block.dart`,
 modes `full`/`compact`) l'affiche avec − / + sur le tableau de bord : on change le
-niveau là où on tourne la molette. Il agit sur `SensorHub.brakeConnection` (le
+niveau là où on tourne la molette. Un glissé de 50 px sur le composant fait aussi un cran, comme sur
+le minuteur : **gauche = −1, droite = +1**. Il agit sur `SensorHub.brakeConnection` (le
 vélo qui publie sa puissance **sans** FTMS, connecté de préférence) ; sans un tel
 vélo il montre `—` et ses boutons sont inertes. **Le jeton `brake_level` doit aussi
 exister côté site** (éditeur de profils, `CompanionSettings`, dépôt Rails) : un

@@ -53,7 +53,7 @@ class CyclingPowerDecoder {
       final revs = bytes.getUint32(offset, Endian.little);
       final time = bytes.getUint16(offset + 4, Endian.little);
       offset += 6;
-      final rps = _wheel.update(revs, time);
+      final rps = _wheel.update(revs, time, at: now);
       if (rps != null) samples.add(WheelSpeedSample(now, rps));
     }
 
@@ -62,7 +62,7 @@ class CyclingPowerDecoder {
       final revs = bytes.getUint16(offset, Endian.little);
       final time = bytes.getUint16(offset + 2, Endian.little);
       offset += 4;
-      final rps = _crank.update(revs, time);
+      final rps = _crank.update(revs, time, at: now);
       if (rps != null) samples.add(CadenceSample(now, rps * 60));
     }
 
