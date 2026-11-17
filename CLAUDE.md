@@ -994,8 +994,21 @@ les profils du site.
   relais. Permission `BLUETOOTH_ADVERTISE` (Android 12+).
 - Le relais ne vit que tant que le processus vit : il n'a pas de service au
   premier plan à lui (celui du GPS en fournit un pendant un enregistrement avec GPS).
+- **Les services s'ajoutent un par un** : `addService` refuse en silence un
+  second appel avant `onServiceAdded`, et l'annonce promettait alors un service
+  absent. `BleRelay.kt` file d'attente, puis annonce seulement les services
+  réellement acceptés.
+- **Mesuré avec une Forerunner 965 : la montre doit avoir coupé sa liaison au
+  téléphone** (Paramètres → Téléphone, ou Garmin Connect déconnecté). Tant que
+  Garmin Connect la tient reliée, elle voit le capteur dans sa liste mais « erreur
+  de connexion » à la sélection, et **aucune connexion n'atteint le serveur GATT**
+  (logcat `relay` : rien après le démarrage). Cause probable : bondée avec le
+  téléphone, elle résout l'adresse d'annonce vers un appareil déjà connecté. Piège
+  de diagnostic : à l'ouverture du serveur, Android y rapporte aussi les
+  connexions *sortantes* de l'appli (vélo, montre) — ce ne sont pas des clients du
+  relais.
 - **Non vérifié sur matériel** : la valeur déclarée de *Cycling Power Feature*
-  (0x0F) et l'acceptation par une Forerunner restent à mesurer sur le téléphone.
+  (0x0F) ; la Forerunner accepte bien le relais une fois sa liaison téléphone coupée.
 
 ## Calibrer un capteur de puissance
 

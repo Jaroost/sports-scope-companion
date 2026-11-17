@@ -76,7 +76,8 @@ class AndroidRelayPlatform implements RelayPlatform {
 /// connecter, pour un récepteur qui n'y parvient pas (montre Garmin face à un
 /// home-trainer qui n'accepte qu'une connexion).
 ///
-/// On rediffuse les **trames brutes**, octets pour octets, et non des mesures
+/// On rediffuse les **trames brutes**, octets pour octets (sauf les watts d'un
+/// vélo calibré, voir `SensorHub.relayFrame`), et non des mesures
 /// ré-encodées : la montre reçoit exactement ce que le capteur a dit (tours de
 /// manivelle, équilibre, flags), sans que l'appli ait à en comprendre le
 /// format. Conséquence assumée : le réglage porte sur une caractéristique
@@ -152,9 +153,17 @@ class BleRelay extends ChangeNotifier {
 
   void _onFrame(RawFrame frame) {
     final kind = relayKindOf(frame.characteristicUuid);
-    if (kind == null || !_announced.contains(kind)) return;
+    if (kind == null) return;
+    if (kind == SensorKind.power || kind == SensorKind.speedCadence) {
+      debugPrint('[relais] ${frame.characteristicUuid} source=${frame.source} '
+          'relayée=${_announced.contains(kind)} octets='
+          '${frame.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+    }
+    if (!_announced.contains(kind)) return;
     if (!_gate.accept(kind, frame.source, frame.at)) return;
-    unawaited(_platform.notify(frame.characteristicUuid, frame.bytes));
+    // Puissance corrigée comme à l'écran : la montre lit les mêmes watts.
+    final out = _hub.relayFrame(frame);
+    unawaited(_platform.notify(out.characteristicUuid, out.bytes));
   }
 
   Future<void> _stop() async {

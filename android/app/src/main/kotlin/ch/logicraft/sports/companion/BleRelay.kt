@@ -140,29 +140,49 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
         }
     }
 
+    /**
+     * Une annonce par service, chacune avec sa propre adresse. Mesuré : annoncés
+     * ensemble, puissance et vitesse/cadence font un seul « capteur de
+     * puissance » pour une Forerunner, qui ne s'abonne qu'à la puissance et
+     * n'affiche jamais la cadence. Séparés, elle peut appairer chacun pour ce
+     * qu'il est. Le serveur GATT reste unique.
+     */
     private fun startAdvertising() {
         val advertiser = pendingAdvertiser ?: return
         if (announced.isEmpty()) return
-        // Drapeaux + liste des services (≤ 3 × 2 octets, loin de la limite de
-        // 31 octets). Le nom, lui, va dans la réponse au scan.
-        val data = AdvertiseData.Builder().setIncludeDeviceName(false).apply {
-            announced.forEach { addServiceUuid(ParcelUuid(it)) }
-        }.build()
         val scanResponse = AdvertiseData.Builder().setIncludeDeviceName(true).build()
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setConnectable(true)
             .setTimeout(0)
             .build()
-        advertiser.startAdvertising(settings, data, scanResponse, advertiseCallback)
+        for (uuid in announced) {
+            val data = AdvertiseData.Builder().setIncludeDeviceName(false)
+                .addServiceUuid(ParcelUuid(uuid)).build()
+            val callback = object : AdvertiseCallback() {
+                override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                    android.util.Log.i("relay", "annonce ok $uuid")
+                }
+
+                override fun onStartFailure(errorCode: Int) {
+                    android.util.Log.e("relay", "annonce échec $uuid code=$errorCode")
+                }
+            }
+            advertiseCallbacks += callback
+            advertiser.startAdvertising(settings, data, scanResponse, callback)
+        }
         advertising = true
     }
+
+    private val advertiseCallbacks = ArrayList<AdvertiseCallback>()
 
     private fun stop() {
         pending.clear()
         announced.clear()
         if (advertising) {
-            manager.adapter?.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
+            val advertiser = manager.adapter?.bluetoothLeAdvertiser
+            advertiseCallbacks.forEach { advertiser?.stopAdvertising(it) }
+            advertiseCallbacks.clear()
             advertising = false
         }
         server?.close()
@@ -255,6 +275,7 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
 
     private val callback = object : BluetoothGattServerCallback() {
         override fun onServiceAdded(status: Int, service: BluetoothGattService) {
+            android.util.Log.i("relay", "service ${service.uuid} status=$status")
             main.post {
                 if (status == BluetoothGatt.GATT_SUCCESS) announced += service.uuid
                 addNextService()
@@ -262,6 +283,7 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
         }
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+            android.util.Log.i("relay", "connexion ${device.address} status=$status state=$newState")
             if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 subscribed.values.forEach { it.remove(device) }
                 publishCount()
@@ -271,6 +293,7 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
         override fun onCharacteristicReadRequest(
             device: BluetoothDevice, requestId: Int, offset: Int, characteristic: BluetoothGattCharacteristic,
         ) {
+            android.util.Log.i("relay", "lecture ${characteristic.uuid} offset=$offset")
             @Suppress("DEPRECATION")
             val value = characteristic.value ?: ByteArray(0)
             val slice = if (offset <= value.size) value.copyOfRange(offset, value.size) else ByteArray(0)
@@ -290,6 +313,7 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
             preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray,
         ) {
             val id = descriptor.characteristic.uuid
+            android.util.Log.i("relay", "abonnement ${device.address} $id valeur=${value.joinToString { "%02x".format(it) }}")
             val enable = value.isNotEmpty() && value[0].toInt() and 0x01 != 0
             val set = subscribed.getOrPut(id) { HashSet() }
             if (enable) set.add(device) else set.remove(device)
@@ -297,12 +321,6 @@ class BleRelay(private val context: Context, messenger: BinaryMessenger) {
                 server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, value)
             }
             publishCount()
-        }
-    }
-
-    private val advertiseCallback = object : AdvertiseCallback() {
-        override fun onStartFailure(errorCode: Int) {
-            advertising = false
         }
     }
 

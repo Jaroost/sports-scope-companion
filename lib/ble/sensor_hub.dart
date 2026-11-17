@@ -8,6 +8,7 @@ import 'primary_source_gate.dart';
 import 'samples.dart';
 import 'sensor_connection.dart';
 import 'sensor_profile.dart';
+import 'sensor_uuids.dart';
 import 'trainer_calibration_store.dart';
 
 /// Agrège plusieurs capteurs en un seul flux d'échantillons.
@@ -143,33 +144,63 @@ class SensorHub {
   /// sa propre estimation et la courbe se mordrait la queue.
   bool bypassCalibration = false;
 
-  /// Remplace les watts d'un vélo d'appartement par l'estimation tirée de son
-  /// niveau de résistance et de la cadence, si le cycliste l'a calibré et
-  /// activé. Appliqué ici, **avant** `_samples` : l'enregistreur, le pont et
-  /// l'écran voient tous la même puissance — pas seulement `latestPower`.
+  /// Les watts estimés par la calibration du vélo [source], ou `null` si elle
+  /// n'a rien à dire (pas calibrée, coupée, ou sans niveau/cadence récents).
   ///
   /// On ne devine jamais : sans niveau de résistance ni cadence récents, la
-  /// mesure du vélo passe telle quelle. Les trames brutes (donc le relais vers
-  /// une montre) ne sont, elles, **pas** corrigées.
-  SensorSample _calibrated(SensorConnection source, SensorSample sample) {
-    if (sample is! PowerSample || bypassCalibration) return sample;
-    final model =
-        trainerCalibration?.modelFor(source.device.remoteId.str);
+  /// mesure du vélo passe telle quelle.
+  int? _calibratedWatts(SensorConnection source) {
+    if (bypassCalibration) return null;
+    final id = source.device.remoteId.str;
+    final model = trainerCalibration?.modelFor(id);
     // Un vélo sans FTMS ne publie pas son niveau de frein : le cycliste le dit à
     // la main (`manualLevelFor`, réglé sur la page de calibration). Un vélo FTMS
     // dont la résistance vient de se taire, lui, ne retombe pas sur ce niveau.
-    final id = source.device.remoteId.str;
     final hasResistance =
         source.detectedKinds.value.contains(SensorKind.trainer);
     final resistance = latestResistance.value ??
         (hasResistance ? null : trainerCalibration?.manualLevelFor(id));
     final cadence = latestCadence.value;
-    if (model == null || resistance == null || cadence == null) return sample;
+    if (model == null || resistance == null || cadence == null) return null;
+    return model.estimate(resistance: resistance, cadence: cadence)?.round();
+  }
 
-    final watts = model.estimate(resistance: resistance, cadence: cadence);
+  /// Remplace les watts d'un vélo d'appartement par l'estimation tirée de son
+  /// niveau de résistance et de la cadence, si le cycliste l'a calibré et
+  /// activé. Appliqué ici, **avant** `_samples` : l'enregistreur, le pont et
+  /// l'écran voient tous la même puissance — pas seulement `latestPower`.
+  SensorSample _calibrated(SensorConnection source, SensorSample sample) {
+    if (sample is! PowerSample) return sample;
+    final watts = _calibratedWatts(source);
     if (watts == null) return sample;
-    return PowerSample(sample.at, watts.round(),
+    return PowerSample(sample.at, watts,
         balanceLeftPercent: sample.balanceLeftPercent);
+  }
+
+  /// La trame à rediffuser à la montre. Les trames brutes restent brutes pour le
+  /// diagnostic (`rawFrames`), mais la montre doit lire les mêmes watts que
+  /// l'écran et le `.fit` : sans ça, deux puissances pour une sortie. Seuls les
+  /// deux octets de puissance instantanée (sint16, après les drapeaux) sont
+  /// remplacés — équilibre, tours de manivelle et le reste partent intacts.
+  RawFrame relayFrame(RawFrame frame) {
+    if (Guid(frame.characteristicUuid) !=
+            BleCharacteristics.cyclingPowerMeasurement ||
+        frame.bytes.length < 4) {
+      return frame;
+    }
+    SensorConnection? source;
+    for (final c in _connections) {
+      if (c.device.remoteId.str == frame.source) source = c;
+    }
+    if (source == null) return frame;
+    final watts = _calibratedWatts(source);
+    if (watts == null) return frame;
+    final clamped = watts.clamp(-32768, 32767);
+    final bytes = [...frame.bytes];
+    bytes[2] = clamped & 0xFF;
+    bytes[3] = (clamped >> 8) & 0xFF;
+    return RawFrame(frame.at, frame.characteristicUuid, bytes,
+        source: frame.source);
   }
 
   void _onSample(SensorConnection source, SensorSample rawSample) {

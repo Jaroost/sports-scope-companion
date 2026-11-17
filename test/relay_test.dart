@@ -2,10 +2,19 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sports_scope_companion/ble/relay/relay_gate.dart';
+import 'package:sports_scope_companion/ble/samples.dart';
+import 'package:sports_scope_companion/ble/sensor_hub.dart';
 import 'package:sports_scope_companion/ble/relay/relay_store.dart';
 import 'package:sports_scope_companion/ble/sensor_profile.dart';
 
 void main() {
+  test('relayFrame : sans calibration ni source connue, la trame part intacte', () {
+    final hub = SensorHub();
+    final frame = RawFrame(DateTime(2026), '2a63', [0, 0, 100, 0, 1, 2],
+        source: 'AA:BB');
+    expect(identical(hub.relayFrame(frame), frame), isTrue);
+  });
+
   test('relayKindOf reconnaît les trois mesures, forme courte ou longue', () {
     expect(relayKindOf('2a37'), SensorKind.heartRate);
     expect(relayKindOf('00002a63-0000-1000-8000-00805f9b34fb'), SensorKind.power);
