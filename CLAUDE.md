@@ -1148,6 +1148,15 @@ puissance d'une référence : un relevé `(résistance, cadence, watts)`.
   niveau le plus proche**, jamais d'extrapolation ;
 - cadence nulle ⇒ 0 W.
 
+**Sans FTMS** (vélo qui n'a que Cycling Power / CSC, ex. « situs fitness » — mesuré :
+aucun niveau de frein dans ses services, le seul propriétaire est le DFU Nordic), le
+menu est proposé dès que l'appareil a la capacité `power`. Le niveau du frein se
+**saisit à la main** (`TrainerCalibrationStore.manualLevelFor`, par appareil, sur la
+page de calibration) : il range les relevés et choisit la courbe, comme une
+résistance FTMS. `_calibrated` l'utilise seulement si l'appareil n'a pas `trainer`
+— un FTMS dont la résistance se tait ne retombe pas dessus. Oublier de le mettre à
+jour après un coup de molette fausse les watts : c'est une limite assumée.
+
 `SensorHub._calibrated` remplace les watts **avant** `_samples` (enregistreur,
 pont et écran voient la même valeur). Il ne devine jamais : sans résistance ni
 cadence récentes, ou si la correction est coupée (défaut), la mesure du vélo

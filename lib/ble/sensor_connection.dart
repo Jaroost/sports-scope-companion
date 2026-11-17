@@ -208,6 +208,23 @@ class SensorConnection {
     final services = await device.discoverServices();
     // Les handles GATT peuvent changer d'une connexion à l'autre, pas les
     // UUID : on ne résout que par UUID.
+    // Inventaire complet, pas seulement ce que nos profils reconnaissent : c'est
+    // ce qui dit si un appareil cache un service propriétaire (niveau de frein
+    // d'un vélo d'appartement, par exemple) que l'appli ne sait pas encore lire.
+    for (final service in services) {
+      for (final c in service.characteristics) {
+        final p = c.properties;
+        final props = [
+          if (p.read) 'read',
+          if (p.write) 'write',
+          if (p.writeWithoutResponse) 'writeNoResp',
+          if (p.notify) 'notify',
+          if (p.indicate) 'indicate',
+        ].join(',');
+        debugPrint('[ble] $name: service ${service.uuid.str} '
+            'car. ${c.uuid.str} [$props]');
+      }
+    }
     final characteristics = {
       for (final service in services)
         for (final c in service.characteristics) c.uuid: c,

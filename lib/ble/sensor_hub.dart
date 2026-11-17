@@ -133,7 +133,14 @@ class SensorHub {
     if (sample is! PowerSample) return sample;
     final model =
         trainerCalibration?.modelFor(source.device.remoteId.str);
-    final resistance = latestResistance.value;
+    // Un vélo sans FTMS ne publie pas son niveau de frein : le cycliste le dit à
+    // la main (`manualLevelFor`, réglé sur la page de calibration). Un vélo FTMS
+    // dont la résistance vient de se taire, lui, ne retombe pas sur ce niveau.
+    final id = source.device.remoteId.str;
+    final hasResistance =
+        source.detectedKinds.value.contains(SensorKind.trainer);
+    final resistance = latestResistance.value ??
+        (hasResistance ? null : trainerCalibration?.manualLevelFor(id));
     final cadence = latestCadence.value;
     if (model == null || resistance == null || cadence == null) return sample;
 

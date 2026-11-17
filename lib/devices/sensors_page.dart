@@ -350,6 +350,7 @@ class _SensorsPageState extends State<SensorsPage> {
                     store: store,
                     deviceId: known.remoteId,
                     deviceName: known.name,
+                    usesResistance: known.kinds.contains(SensorKind.trainer),
                   ),
                 ));
             }
@@ -365,8 +366,11 @@ class _SensorsPageState extends State<SensorsPage> {
                 status == SensorStatus.connected)
               const PopupMenuItem(
                   value: 'calibrate', child: Text('Calibrer la puissance')),
-            // La résistance n'existe qu'en FTMS : sans elle, rien à relever.
-            if (known.kinds.contains(SensorKind.trainer) &&
+            // Avec FTMS la correction suit résistance et cadence ; sans, un
+            // vélo qui publie sa puissance (Cycling Power) se corrige par la
+            // cadence seule.
+            if ((known.kinds.contains(SensorKind.trainer) ||
+                    known.kinds.contains(SensorKind.power)) &&
                 _hub.trainerCalibration != null)
               const PopupMenuItem(
                   value: 'trainer', child: Text('Calibrer la puissance (vélo)')),

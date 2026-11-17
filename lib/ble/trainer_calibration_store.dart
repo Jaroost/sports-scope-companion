@@ -41,6 +41,17 @@ class TrainerCalibrationStore extends ChangeNotifier {
   /// le cycliste n'a pas relevé de points et dit oui, rien ne change.
   bool enabledFor(String deviceId) => _entries[deviceId]?.enabled ?? false;
 
+  /// Le niveau du frein réglé à la main, pour un vélo qui ne le publie pas (pas
+  /// de FTMS). Mémorisé par appareil : c'est la molette du vélo, que l'appli ne
+  /// peut pas lire, et on la retrouve où on l'a laissée.
+  int manualLevelFor(String deviceId) => _entries[deviceId]?.manualLevel ?? 1;
+
+  Future<void> setManualLevel(String deviceId, int level) {
+    _entries.putIfAbsent(deviceId, _Entry.new).manualLevel =
+        level.clamp(0, 99);
+    return _changed(deviceId);
+  }
+
   /// Le modèle à appliquer, ou `null` s'il n'y a rien à corriger (désactivé, ou
   /// aucun relevé). Mis en cache : le hub l'interroge à chaque trame.
   TrainerPowerModel? modelFor(String deviceId) {
@@ -89,6 +100,9 @@ class TrainerCalibrationStore extends ChangeNotifier {
         final points = value['points'];
         _entries[entry.key as String] = _Entry()
           ..enabled = value['enabled'] == true
+          ..manualLevel = value['manualLevel'] is int
+              ? (value['manualLevel'] as int).clamp(0, 99)
+              : 1
           ..points.addAll([
             if (points is List)
               for (final raw in points)
@@ -133,10 +147,12 @@ class TrainerCalibrationStore extends ChangeNotifier {
 
 class _Entry {
   var enabled = false;
+  var manualLevel = 1;
   final points = <TrainerCalibrationPoint>[];
 
   Map<String, Object> toJson() => {
         'enabled': enabled,
+        'manualLevel': manualLevel,
         'points': [for (final point in points) point.toJson()],
       };
 }

@@ -18,7 +18,13 @@ class TrainerCalibrationPage extends StatefulWidget {
     required this.store,
     required this.deviceId,
     required this.deviceName,
+    this.usesResistance = true,
   });
+
+  /// Faux pour un vélo sans FTMS (cardio / Cycling Power / CSC seulement) : pas
+  /// de niveau de résistance à lire, la puissance se corrige par la cadence
+  /// seule et tous les relevés tombent au niveau 0.
+  final bool usesResistance;
 
   final SensorHub hub;
   final TrainerCalibrationStore store;
@@ -39,7 +45,9 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
   }
 
   Future<void> _addPoint() async {
-    final resistance = widget.hub.latestResistance.value;
+    final resistance = widget.usesResistance
+        ? widget.hub.latestResistance.value
+        : widget.store.manualLevelFor(widget.deviceId);
     final cadence = widget.hub.latestCadence.value;
     final watts = double.tryParse(_watts.text.trim().replaceAll(',', '.'));
     if (resistance == null || cadence == null || cadence <= 0) return;
@@ -53,7 +61,8 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
     _watts.clear();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Relevé ajouté : niveau $resistance, '
+      content: Text('Relevé ajouté : '
+          'niveau $resistance, '
           '${cadence.round()} tr/min, ${watts.round()} W'),
     ));
   }
@@ -63,7 +72,10 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
     final hub = widget.hub;
     final store = widget.store;
     return Scaffold(
-      appBar: AppBar(title: const Text('Calibrer le home-trainer')),
+      appBar: AppBar(
+          title: Text(widget.usesResistance
+              ? 'Calibrer le home-trainer'
+              : 'Calibrer selon frein et cadence')),
       body: ListenableBuilder(
         listenable: store,
         builder: (context, _) {
@@ -87,6 +99,38 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
                     ? null
                     : (value) => store.setEnabled(widget.deviceId, value),
               ),
+              if (!widget.usesResistance) ...[
+                // Le vélo ne publie pas son frein : on le dit ici, et c'est
+                // ce niveau qui range les relevés et choisit la courbe.
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Niveau du frein'),
+                  subtitle: const Text(
+                      'Celui de la molette du vélo. Changez-le ici dès que '
+                      'vous la tournez.'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        tooltip: 'Niveau moins un',
+                        onPressed: () => store.setManualLevel(
+                            widget.deviceId,
+                            store.manualLevelFor(widget.deviceId) - 1),
+                      ),
+                      Text('${store.manualLevelFor(widget.deviceId)}',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        tooltip: 'Niveau plus un',
+                        onPressed: () => store.setManualLevel(
+                            widget.deviceId,
+                            store.manualLevelFor(widget.deviceId) + 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Divider(),
               Text('En direct',
                   style: Theme.of(context).textTheme.titleMedium),
@@ -99,7 +143,12 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
                 ]),
                 builder: (context, _) => Row(
                   children: [
-                    _Reading('Résistance', hub.latestResistance.value, ''),
+                    _Reading(
+                        widget.usesResistance ? 'Résistance' : 'Frein',
+                        widget.usesResistance
+                            ? hub.latestResistance.value
+                            : store.manualLevelFor(widget.deviceId),
+                        ''),
                     _Reading(
                         'Cadence', hub.latestCadence.value?.round(), ' tr/min'),
                     _Reading('Puissance', hub.latestPower.value, ' W'),
@@ -111,9 +160,15 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                'Réglez une résistance, pédalez à cadence stable, puis entrez '
-                'la puissance lue sur votre référence. Variez le niveau et la '
-                'cadence d’un relevé à l’autre.',
+                widget.usesResistance
+                    ? 'Réglez une résistance, pédalez à cadence stable, puis '
+                        'entrez la puissance lue sur votre référence. Variez le '
+                        'niveau et la cadence d’un relevé à l’autre.'
+                    : 'Pédalez à cadence stable, puis entrez la puissance lue '
+                        'sur votre référence. Variez la cadence d’un relevé à '
+                        'l’autre : deux relevés suffisent pour ajuster la '
+                        'courbe, un seul suppose que la puissance suit la '
+                        'cadence.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
@@ -141,7 +196,8 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
               const SizedBox(height: 4),
               ValueListenableBuilder<int?>(
                 valueListenable: hub.latestResistance,
-                builder: (context, resistance, _) => resistance == null
+                builder: (context, resistance, _) =>
+                    widget.usesResistance && resistance == null
                     ? Text(
                         'Aucune résistance reçue : le vélo n’expose pas '
                         'FTMS, ou il ne pédale pas encore.',
