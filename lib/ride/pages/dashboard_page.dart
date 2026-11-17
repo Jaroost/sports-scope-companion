@@ -40,6 +40,7 @@ import '../blocks/bell_block.dart';
 import '../blocks/leave_ride_block.dart';
 import '../blocks/torch_block.dart';
 import '../blocks/sleep_block.dart';
+import '../blocks/brake_level_block.dart';
 import '../blocks/toggle_workout_block.dart';
 import '../blocks/training_budget_block.dart';
 import '../blocks/workout_remaining_block.dart';
@@ -606,6 +607,12 @@ class DashboardPage extends StatelessWidget {
             mode: torch.mode,
             color: torch.color,
             textColor: torch.textColor,
+          ),
+        final BrakeLevelBlock brake => BrakeLevelControl(
+            hub: sources.hub,
+            mode: brake.mode,
+            color: brake.color,
+            textColor: brake.textColor,
           ),
         final BellBlock bell => BellControl(
             mode: bell.mode,

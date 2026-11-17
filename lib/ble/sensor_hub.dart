@@ -84,6 +84,23 @@ class SensorHub {
           if (connection.detectedKinds.value.contains(kind)) connection,
       ];
 
+  /// Le vélo dont le niveau de frein se règle à la main : celui qui publie sa
+  /// puissance sans FTMS (donc sans résistance lisible). Un appareil connecté
+  /// passe avant un autre ; `null` s'il n'y en a aucun.
+  SensorConnection? get brakeConnection {
+    SensorConnection? fallback;
+    for (final connection in _connections) {
+      final kinds = connection.detectedKinds.value;
+      if (!kinds.contains(SensorKind.power) ||
+          kinds.contains(SensorKind.trainer)) {
+        continue;
+      }
+      if (connection.status.value == SensorStatus.connected) return connection;
+      fallback ??= connection;
+    }
+    return fallback;
+  }
+
   /// Une connexion déjà ouverte vers cet appareil, s'il y en a une.
   SensorConnection? connectionFor(DeviceIdentifier remoteId) {
     for (final connection in _connections) {

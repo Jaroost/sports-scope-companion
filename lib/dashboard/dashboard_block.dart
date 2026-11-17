@@ -183,6 +183,11 @@ sealed class DashboardBlock {
           color: color,
           textColor: textColor,
         ),
+      'brake_level' => BrakeLevelBlock(
+          mode: _modeOf(raw['mode'], BrakeLevelMode.values),
+          color: color,
+          textColor: textColor,
+        ),
       'bell' => BellBlock(
           mode: _modeOf(raw['mode'], BellMode.values),
           sound: _modeOf(raw['sound'], BellSound.values),
@@ -1588,6 +1593,42 @@ enum TorchMode with BlockMode {
   compact('compact');
 
   const TorchMode(this.key);
+
+  @override
+  final String key;
+}
+
+/// Affiche, et règle à la main, le niveau du frein d'un vélo d'appartement qui
+/// ne le publie pas — voir [BrakeLevelControl] (`brake_level_block.dart`). Le
+/// niveau sert à la correction de puissance par cadence (`TrainerCalibrationStore`).
+class BrakeLevelBlock extends DashboardBlock {
+  const BrakeLevelBlock({
+    this.mode = BrakeLevelMode.full,
+    super.color,
+    super.textColor,
+  });
+
+  final BrakeLevelMode mode;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BrakeLevelBlock &&
+      other.mode == mode &&
+      other.color == color &&
+      other.textColor == textColor;
+
+  @override
+  int get hashCode => Object.hash(mode, color, textColor);
+}
+
+enum BrakeLevelMode with BlockMode {
+  /// Le niveau en grand entre deux gros boutons − / +.
+  full('full'),
+
+  /// Une rangée basse : − niveau +, pour une cellule de bandeau.
+  compact('compact');
+
+  const BrakeLevelMode(this.key);
 
   @override
   final String key;

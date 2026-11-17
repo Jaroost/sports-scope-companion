@@ -1157,6 +1157,14 @@ résistance FTMS. `_calibrated` l'utilise seulement si l'appareil n'a pas `train
 — un FTMS dont la résistance se tait ne retombe pas dessus. Oublier de le mettre à
 jour après un coup de molette fausse les watts : c'est une limite assumée.
 
+Le composant `brake_level` (`BrakeLevelBlock`, `ride/blocks/brake_level_block.dart`,
+modes `full`/`compact`) l'affiche avec − / + sur le tableau de bord : on change le
+niveau là où on tourne la molette. Il agit sur `SensorHub.brakeConnection` (le
+vélo qui publie sa puissance **sans** FTMS, connecté de préférence) ; sans un tel
+vélo il montre `—` et ses boutons sont inertes. **Le jeton `brake_level` doit aussi
+exister côté site** (éditeur de profils, `CompanionSettings`, dépôt Rails) : un
+site qui l'ignore ne le proposera jamais, et l'appli ignore tout jeton inconnu.
+
 `SensorHub._calibrated` remplace les watts **avant** `_samples` (enregistreur,
 pont et écran voient la même valeur). Il ne devine jamais : sans résistance ni
 cadence récentes, ou si la correction est coupée (défaut), la mesure du vélo
