@@ -40,6 +40,7 @@ class TrainerCalibrationPage extends StatefulWidget {
 
 class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
   final _watts = TextEditingController();
+  final _cadence = TextEditingController();
   final _learning = ValueNotifier<bool>(false);
   TrainerLearningSession _session = TrainerLearningSession();
   Timer? _learningTick;
@@ -49,6 +50,7 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
     _stopLearning();
     _learning.dispose();
     _watts.dispose();
+    _cadence.dispose();
     super.dispose();
   }
 
@@ -165,7 +167,12 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
     final resistance = widget.usesResistance
         ? widget.hub.latestResistance.value
         : widget.store.manualLevelFor(widget.deviceId);
-    final cadence = widget.hub.latestCadence.value;
+    // Cadence saisie : « cadence x donne puissance y » sans pédaler, d'après
+    // une table du constructeur. Vide, on prend la cadence en direct.
+    final typed = _cadence.text.trim();
+    final cadence = typed.isEmpty
+        ? widget.hub.latestCadence.value
+        : double.tryParse(typed.replaceAll(',', '.'));
     final watts = double.tryParse(_watts.text.trim().replaceAll(',', '.'));
     if (resistance == null || cadence == null || cadence <= 0) return;
     if (watts == null || watts <= 0) return;
@@ -179,6 +186,7 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
       ),
     );
     _watts.clear();
+    _cadence.clear();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -310,6 +318,24 @@ class _TrainerCalibrationPageState extends State<TrainerCalibrationPage> {
                           'courbe, un seul suppose que la puissance suit la '
                           'cadence.',
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Sans pédaler : saisissez la cadence ET la puissance '
+                '(« cette cadence donne cette puissance ») pour le niveau '
+                'affiché. Cadence vide, la cadence en direct est utilisée.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _cadence,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Cadence (tr/min) — facultatif',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 8),
               Row(

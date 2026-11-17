@@ -162,7 +162,19 @@ class BleRelay extends ChangeNotifier {
     if (!_announced.contains(kind)) return;
     if (!_gate.accept(kind, frame.source, frame.at)) return;
     // Puissance corrigée comme à l'écran : la montre lit les mêmes watts.
-    final out = _hub.relayFrame(frame);
+    // Une erreur de correction ne doit jamais couper la puissance de la montre :
+    // dans le doute, la trame brute part.
+    var out = frame;
+    try {
+      out = _hub.relayFrame(frame);
+    } catch (e) {
+      debugPrint('[relais] correction impossible, trame brute : $e');
+    }
+    if (kind == SensorKind.power && !listEquals(out.bytes, frame.bytes)) {
+      debugPrint('[relais] watts corrigés '
+          '${frame.bytes[2] | (frame.bytes[3] << 8)} → '
+          '${out.bytes[2] | (out.bytes[3] << 8)}');
+    }
     unawaited(_platform.notify(out.characteristicUuid, out.bytes));
   }
 
