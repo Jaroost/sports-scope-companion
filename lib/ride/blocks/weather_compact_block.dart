@@ -158,7 +158,7 @@ class _WeatherCompactCard extends StatelessWidget {
     final now = forecast.steps.first;
     final later = _sixHourStepOf(forecast);
 
-    Widget tile(String label, String value, Color bg, _Trend? trend) {
+    Widget tile(IconData glyph, String value, Color bg, _Trend? trend) {
       final ink = foregroundOf(bg);
       const metrics = BlockMetrics.natural;
       return Expanded(
@@ -167,22 +167,18 @@ class _WeatherCompactCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                label.toUpperCase(),
-                maxLines: 1,
-                style: TextStyle(color: ink.withValues(alpha: 0.75), fontSize: metrics.titleSize),
-              ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    value,
-                    maxLines: 1,
-                    style: TextStyle(color: ink, fontSize: metrics.lineSize * 1.6, fontWeight: FontWeight.w700),
-                  ),
+                  Icon(glyph, size: metrics.lineSize * 2.4, color: ink.withValues(alpha: 0.85)),
                   const SizedBox(width: 4),
-                  Icon(_iconFor(trend), size: metrics.lineSize * 1.2, color: ink.withValues(alpha: 0.75)),
+                  Icon(_iconFor(trend), size: metrics.lineSize * 2.4, color: ink.withValues(alpha: 0.85)),
                 ],
+              ),
+              Text(
+                value,
+                maxLines: 1,
+                style: TextStyle(color: ink, fontSize: metrics.lineSize * 1.6, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -194,21 +190,21 @@ class _WeatherCompactCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         tile(
-          'Température',
+          Icons.thermostat,
           '${now.temperature.round()}°C',
           _tempColor,
           later == null ? null : _trendOf(now.temperature, later.temperature, _tempThreshold),
         ),
         const SizedBox(width: 4),
         tile(
-          'Vent',
+          Icons.air,
           '${now.windSpeed.round()} km/h',
           _windColor,
           later == null ? null : _trendOf(now.windSpeed, later.windSpeed, _windThreshold),
         ),
         const SizedBox(width: 4),
         tile(
-          'Pluie',
+          Icons.water_drop,
           '${now.precipitation.toStringAsFixed(1)} mm/h',
           _precipColor,
           later == null ? null : _trendOf(now.precipitation, later.precipitation, _precipThreshold),
