@@ -114,6 +114,17 @@ class _WeatherCompactBlockViewState extends State<WeatherCompactBlockView> {
 /// d'un relevé à l'autre plutôt que de rester stable.
 enum _Trend { up, flat, down }
 
+/// L'icône de tendance entre maintenant et +6h (`steps`, un pas par heure),
+/// mêmes seuils que [WeatherCompactBlockView] — partagée avec le bandeau de
+/// tuiles de [WeatherForecastBlockView]. `trending_flat` si un seul pas.
+IconData weatherTrendIcon(List<WeatherForecastStep> steps, double Function(WeatherForecastStep) pick, double threshold) {
+  if (steps.length < 2) return Icons.trending_flat;
+  final delta = pick(steps[steps.length > 6 ? 6 : steps.length - 1]) - pick(steps.first);
+  if (delta > threshold) return Icons.trending_up;
+  if (delta < -threshold) return Icons.trending_down;
+  return Icons.trending_flat;
+}
+
 /// La carte composée : un titre, trois lignes (pastille de couleur, libellé,
 /// valeur actuelle, flèche de tendance).
 class _WeatherCompactCard extends StatelessWidget {

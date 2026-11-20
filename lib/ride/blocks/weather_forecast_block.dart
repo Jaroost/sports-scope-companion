@@ -7,6 +7,7 @@ import '../../recording/ride_recorder.dart';
 import '../../ui/zone_colors.dart';
 import '../../weather/weather_forecast_client.dart';
 import 'block_card.dart';
+import 'weather_compact_block.dart' show weatherTrendIcon;
 
 /// Les prévisions météo horaires (Open-Meteo), pour la position GPS
 /// courante — voir `WeatherForecastBlock` (`dashboard_block.dart`).
@@ -174,7 +175,7 @@ class _WeatherForecastCard extends StatelessWidget {
           // pousser la carte hors de sa case — le titre et les couleurs du
           // graphique restent lisibles sans elle.
           final showLegend =
-              !constraints.hasBoundedHeight || constraints.maxHeight >= chromeHeight + metrics.gap / 2 + metrics.lineHeight;
+              !constraints.hasBoundedHeight || constraints.maxHeight >= chromeHeight + metrics.gap / 2 + _tileHeight;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,24 +203,21 @@ class _WeatherForecastCard extends StatelessWidget {
               ),
               if (showLegend) ...[
                 SizedBox(height: metrics.gap / 2),
-                // Un `Row` à trois tiers égaux et non un `Wrap` : une case
-                // étroite (une colonne d'une grille à plusieurs colonnes) ne
-                // doit jamais faire passer la légende sur une deuxième
-                // ligne — ce serait une hauteur de plus, non comptée dans
-                // `showLegend`, et donc un débordement. Chaque libellé se
-                // tronque plutôt (`_legendChip`), la légende reste toujours
-                // exactement une ligne.
-                //
-                // La valeur actuelle est dans le nom de la série plutôt que
-                // dans une phrase à part au-dessus du graphique : elle reste
-                // à côté de la couleur qui la dessine, sans ligne dédiée à
-                // budgéter dans `chromeHeight`.
-                Row(
-                  children: [
-                    Expanded(child: _legendChip('Température $_tempLabel', _tempColor, ink, metrics)),
-                    Expanded(child: _legendChip('Vent $_windLabel', _windColor, ink, metrics)),
-                    Expanded(child: _legendChip('Pluie $_precipLabel', _precipColor, ink, metrics)),
-                  ],
+                // Les mêmes tuiles que [WeatherCompactBlockView] en case large :
+                // icône + tendance, valeur actuelle en grand, fond de la couleur
+                // de la série. Hauteur fixe (`_tileHeight`), le contenu se réduit
+                // dans la tuile plutôt que de déborder.
+                SizedBox(
+                  height: _tileHeight,
+                  child: Row(
+                    children: [
+                      Expanded(child: _tile(Icons.thermostat, _tempLabel, _tempColor, weatherTrendIcon(forecast.steps, (s) => s.temperature, 1.0))),
+                      const SizedBox(width: 4),
+                      Expanded(child: _tile(Icons.air, _windLabel, _windColor, weatherTrendIcon(forecast.steps, (s) => s.windSpeed, 3.0))),
+                      const SizedBox(width: 4),
+                      Expanded(child: _tile(Icons.water_drop, _precipLabel, _precipColor, weatherTrendIcon(forecast.steps, (s) => s.precipitation, 0.2))),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -229,20 +227,35 @@ class _WeatherForecastCard extends StatelessWidget {
     );
   }
 
-  Widget _legendChip(String label, Color dot, Color ink, BlockMetrics metrics) => Row(
-        children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: ink.withValues(alpha: 0.75), fontSize: metrics.lineSize * 0.7),
+  /// Hauteur de la rangée de tuiles : une icône (~24) et une valeur (~19) plus
+  /// le rembourrage.
+  static const _tileHeight = 56.0;
+
+  Widget _tile(IconData glyph, String value, Color bg, IconData trend) {
+    const metrics = BlockMetrics.natural;
+    final ink = foregroundOf(bg);
+    return Container(
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      padding: const EdgeInsets.all(4),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(glyph, size: metrics.lineSize * 1.6, color: ink.withValues(alpha: 0.85)),
+                const SizedBox(width: 4),
+                Icon(trend, size: metrics.lineSize * 1.6, color: ink.withValues(alpha: 0.85)),
+              ],
             ),
-          ),
-        ],
-      );
+            Text(value, maxLines: 1, style: TextStyle(color: ink, fontSize: metrics.lineSize * 1.3, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
 
   String get _tempLabel => '${forecast.steps.first.temperature.round()}°C';
   String get _windLabel => '${forecast.steps.first.windSpeed.round()} km/h';
@@ -370,7 +383,7 @@ class _WeatherChartPainter extends CustomPainter {
       final painter = TextPainter(
         text: TextSpan(
           text: '${value.toStringAsFixed(1)}mm',
-          style: const TextStyle(color: _precipColor, fontSize: 8, fontWeight: FontWeight.w600),
+          style: const TextStyle(color: _precipColor, fontSize: 12, fontWeight: FontWeight.w700),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -451,7 +464,7 @@ class _WeatherChartPainter extends CustomPainter {
       final painter = TextPainter(
         text: TextSpan(
           text: '${value.round()}$suffix',
-          style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w600),
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
