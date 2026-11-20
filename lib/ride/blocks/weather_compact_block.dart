@@ -141,7 +141,83 @@ class _WeatherCompactCard extends StatelessWidget {
   static const _precipThreshold = 0.2; // mm/h
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          // Une case plus large que haute : trois tuiles côte à côte, chacune
+          // sur son fond (orange / bleu clair / bleu). Sans dimensions bornées
+          // (page qui défile) on ne sait pas si c'est large : disposition
+          // empilée d'origine.
+          final wide = constraints.hasBoundedWidth &&
+              constraints.hasBoundedHeight &&
+              constraints.maxWidth > constraints.maxHeight;
+          return wide ? _buildTiles() : _buildStacked();
+        },
+      );
+
+  Widget _buildTiles() {
+    final now = forecast.steps.first;
+    final later = _sixHourStepOf(forecast);
+
+    Widget tile(String label, String value, Color bg, _Trend? trend) {
+      final ink = foregroundOf(bg);
+      const metrics = BlockMetrics.natural;
+      return Expanded(
+        child: BlockSurface(
+          background: bg,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                style: TextStyle(color: ink.withValues(alpha: 0.75), fontSize: metrics.titleSize),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    style: TextStyle(color: ink, fontSize: metrics.lineSize * 1.6, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(_iconFor(trend), size: metrics.lineSize * 1.2, color: ink.withValues(alpha: 0.75)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        tile(
+          'Température',
+          '${now.temperature.round()}°C',
+          _tempColor,
+          later == null ? null : _trendOf(now.temperature, later.temperature, _tempThreshold),
+        ),
+        const SizedBox(width: 4),
+        tile(
+          'Vent',
+          '${now.windSpeed.round()} km/h',
+          _windColor,
+          later == null ? null : _trendOf(now.windSpeed, later.windSpeed, _windThreshold),
+        ),
+        const SizedBox(width: 4),
+        tile(
+          'Pluie',
+          '${now.precipitation.toStringAsFixed(1)} mm/h',
+          _precipColor,
+          later == null ? null : _trendOf(now.precipitation, later.precipitation, _precipThreshold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStacked() {
     const metrics = BlockMetrics.natural;
     final ink = textColor ?? (color == null ? Colors.white : foregroundOf(color!));
 
