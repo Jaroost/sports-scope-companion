@@ -119,7 +119,11 @@ sealed class DashboardBlock {
         ),
       'precip_radar' => PrecipRadarBlock(color: color, textColor: textColor),
       'precip_forecast' => PrecipForecastBlock(color: color, textColor: textColor),
-      'weather_forecast' => WeatherForecastBlock(color: color, textColor: textColor),
+      'weather_forecast' => WeatherForecastBlock(
+          mode: _modeOf(raw['mode'], WeatherForecastMode.values),
+          color: color,
+          textColor: textColor,
+        ),
       'weather_compact' => WeatherCompactBlock(color: color, textColor: textColor),
       'wind' => WindBlock(color: color, textColor: textColor),
       'lap_delta' => LapDeltaBlock(color: color, textColor: textColor),
@@ -1925,16 +1929,33 @@ class PrecipForecastBlock extends DashboardBlock {
 /// dans le détail » (le graphique), l'autre à « où en est-on maintenant »
 /// (trois chiffres et leur tendance).
 class WeatherForecastBlock extends DashboardBlock {
-  const WeatherForecastBlock({super.color, super.textColor});
+  const WeatherForecastBlock({this.mode = WeatherForecastMode.full, super.color, super.textColor});
+
+  final WeatherForecastMode mode;
 
   @override
   bool operator ==(Object other) =>
       other is WeatherForecastBlock &&
+      other.mode == mode &&
       other.color == color &&
       other.textColor == textColor;
 
   @override
-  int get hashCode => Object.hash(color, textColor);
+  int get hashCode => Object.hash(mode, color, textColor);
+}
+
+enum WeatherForecastMode with BlockMode {
+  /// Le graphique et, dessous, les tuiles des valeurs actuelles.
+  full('full'),
+
+  /// Le graphique seul (titre, échelles, « Maintenant »/« +Nh »), sans la
+  /// rangée de tuiles : toute la case va à la courbe.
+  chartOnly('chart_only');
+
+  const WeatherForecastMode(this.key);
+
+  @override
+  final String key;
 }
 
 /// Les valeurs météo actuelles (Open-Meteo), pour la position GPS courante :

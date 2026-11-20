@@ -30,12 +30,16 @@ class WeatherForecastBlockView extends StatefulWidget {
   WeatherForecastBlockView({
     super.key,
     required this.recorder,
+    this.showTiles = true,
     this.color,
     this.textColor,
     WeatherForecastClient? client,
   }) : client = client ?? WeatherForecastClient();
 
   final RideRecorder recorder;
+
+  /// Faux pour le mode `chart_only` : pas de rangée de tuiles sous le graphique.
+  final bool showTiles;
   final Color? color;
   final Color? textColor;
 
@@ -111,6 +115,7 @@ class _WeatherForecastBlockViewState extends State<WeatherForecastBlockView> {
 
         return _WeatherForecastCard(
           forecast: WeatherForecast(steps: steps),
+          showTiles: widget.showTiles,
           color: widget.color,
           textColor: widget.textColor,
         );
@@ -122,9 +127,10 @@ class _WeatherForecastBlockViewState extends State<WeatherForecastBlockView> {
 /// La carte composée : un titre, le graphique, sa légende (valeurs actuelles
 /// dans les noms des séries).
 class _WeatherForecastCard extends StatelessWidget {
-  const _WeatherForecastCard({required this.forecast, this.color, this.textColor});
+  const _WeatherForecastCard({required this.forecast, this.showTiles = true, this.color, this.textColor});
 
   final WeatherForecast forecast;
+  final bool showTiles;
   final Color? color;
   final Color? textColor;
 
@@ -174,8 +180,8 @@ class _WeatherForecastCard extends StatelessWidget {
           // (`RenderFlex overflowed`). Elle disparaît alors plutôt que de
           // pousser la carte hors de sa case — le titre et les couleurs du
           // graphique restent lisibles sans elle.
-          final showLegend =
-              !constraints.hasBoundedHeight || constraints.maxHeight >= chromeHeight + metrics.gap / 2 + _tileHeight;
+          final showLegend = showTiles &&
+              (!constraints.hasBoundedHeight || constraints.maxHeight >= chromeHeight + metrics.gap / 2 + _tileHeight);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,

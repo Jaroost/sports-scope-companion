@@ -479,6 +479,7 @@ class DashboardPage extends StatelessWidget {
           ),
         final WeatherForecastBlock weatherForecast => WeatherForecastBlockView(
             recorder: sources.recorder,
+            showTiles: weatherForecast.mode == WeatherForecastMode.full,
             color: weatherForecast.color,
             textColor: weatherForecast.textColor,
           ),
