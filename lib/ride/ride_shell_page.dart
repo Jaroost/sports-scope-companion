@@ -1235,9 +1235,6 @@ class _RideShellPageState extends State<RideShellPage>
       ),
     );
 
-    // La veille de la page web se réveille toute seule à l'approche d'un
-    // virage — c'est elle qui l'a vu venir.
-    //
     // Une alerte referme la page du menu, **avant** que la politique ne décide.
     //
     // Deux raisons, et la seconde est la plus fourbe : d'abord une page opaque
@@ -1255,7 +1252,17 @@ class _RideShellPageState extends State<RideShellPage>
     // alerte durait.
     final alertRising = alert != RideAlert.none && _lastAlert == RideAlert.none;
     _lastAlert = alert;
-    if (alertRising) _setMenuPage(null);
+    if (alertRising) {
+      _setMenuPage(null);
+      // Le réveil de la page n'est pas à attendre d'elle : la demande de veille
+      // est retenue pendant qu'on lit une page de données, donc revenir sur la
+      // carte rendrait aussitôt le voile noir — au pire moment. La page se
+      // réveille d'elle-même au virage qu'elle a vu venir, mais pas quand
+      // l'alerte vient du chien de garde natif (elle s'est tue), ni quand
+      // l'appli la ramène avant elle. Idempotent côté site, sans effet sur un
+      // site plus ancien ; la luminosité suit par le message `screen`.
+      unawaited(_web?.requestWake());
+    }
 
     final decision = _autoReturn.update(
       now: now,
