@@ -45,6 +45,10 @@ class ScreenPolicy {
   /// appui long de l'appli elle-même a été retirée des autres pages.
   bool get _asleep => _requested && _onMap;
 
+  /// La page est-elle endormie, que le radar l'ait rallumée ou non ? C'est la
+  /// condition d'un réveil volontaire de l'appli (POI à proximité).
+  bool get asleep => _asleep;
+
   /// La veille est-elle interrompue par le radar, et par lui seul ? C'est ce qui
   /// met la page radar à l'écran : sous le voile noir de la page web il n'y a
   /// rien d'autre à regarder. Hors veille, la carte et ses gouttières disent

@@ -48,6 +48,7 @@ import 'remote_volume_pulse_policy.dart';
 import 'native_turn_alerts.dart';
 import 'nav_state.dart';
 import 'nearby_pois.dart';
+import 'poi_approach.dart';
 import 'navigation_web_view.dart';
 import 'offline_map_state.dart';
 import 'pages/dashboard_page.dart';
@@ -258,6 +259,7 @@ class _RideShellPageState extends State<RideShellPage>
   /// site). Lus par la feuille « POI à proximité » ; sans carte, personne ne
   /// les alimente ni ne les regarde.
   final _nearbyPois = NearbyPoisNotifier();
+  final _poiApproach = PoiApproach();
 
   /// Les ravitaillements à venir sur le tracé, poussés par la page (message
   /// `resupply`, voir route_resupply.dart). Lus par `ResupplyCard` ; sans
@@ -1263,6 +1265,16 @@ class _RideShellPageState extends State<RideShellPage>
       // site plus ancien ; la luminosité suit par le message `screen`.
       unawaited(_web?.requestWake());
     }
+
+    // Un POI à portée rallume l'écran endormi : la carte est déjà dessous, c'est
+    // elle qu'on veut voir. Seulement **endormi sur la carte** (`asleep`) — sur
+    // une page de données le cycliste lit déjà quelque chose, on ne le lui
+    // retire pas. `update` est appelé dans tous les cas : voir [PoiApproach].
+    final poiNear = _poiApproach.update(
+      fix: widget.recorder.lastFix,
+      pois: _nearbyPois.value.pois,
+    );
+    if (poiNear && _screenPolicy.asleep) unawaited(_web?.requestWake());
 
     final decision = _autoReturn.update(
       now: now,
