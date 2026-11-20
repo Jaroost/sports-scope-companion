@@ -44,7 +44,15 @@ class BandMetricTile extends StatelessWidget {
     this.color,
     this.altBackground,
     this.labelFirst = false,
+    this.expand = false,
   });
+
+  /// Le fond remplit toute la place donnée par le parent, et le contenu se
+  /// réduit dedans au besoin. Sans ça (défaut), le fond épouse son contenu :
+  /// c'est ce que veut le bandeau du bas, dont les cases ont déjà leur part.
+  /// L'encoche, elle, centrait la case dans un côté de la caméra : le fond ne
+  /// couvrait alors que le chiffre et laissait vide le reste de la place.
+  final bool expand;
 
   final String? value;
   final String label;
@@ -127,7 +135,9 @@ class BandMetricTile extends StatelessWidget {
         color: surface,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: content,
+      child: expand
+          ? Center(child: FittedBox(fit: BoxFit.scaleDown, child: content))
+          : content,
     );
   }
 }

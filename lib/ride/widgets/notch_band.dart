@@ -172,10 +172,13 @@ class _NotchBandState extends State<NotchBand> {
           border: Border(bottom: BorderSide(color: Colors.white24)),
         ),
         child: Row(
+          // Hauteur tendue : une case de mesure doit remplir son côté, pas
+          // seulement épouser son chiffre.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(width: leftWidth, child: Center(child: _slot(current.left))),
+            SizedBox(width: leftWidth, child: _cell(current.left)),
             if (gapWidth > 0) SizedBox(width: gapWidth),
-            SizedBox(width: rightWidth, child: Center(child: _slot(current.right))),
+            SizedBox(width: rightWidth, child: _cell(current.right)),
           ],
         ),
       ),
@@ -188,6 +191,11 @@ class _NotchBandState extends State<NotchBand> {
     }
     return null;
   }
+
+  // Une mesure remplit tout son côté (son fond de zone aussi) ; les autres
+  // cases restent centrées à leur taille.
+  Widget _cell(BandSlot? slot) =>
+      slot is BandMetricSlot ? _slot(slot) : Center(child: _slot(slot));
 
   Widget _slot(BandSlot? slot) {
     if (slot == null) return const SizedBox.shrink();
@@ -253,9 +261,7 @@ class _NotchBandState extends State<NotchBand> {
       RadarBlockView(radar: widget.radar, mode: mode, color: color);
 
   Widget _metric(MetricId metric, Color? color, List<double>? gaugeThresholds, List<Color>? gaugeThresholdColors) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: ListenableBuilder(
+    return ListenableBuilder(
         // Le clignotement hors cible bat au tic de l'enregistreur — ajouté ici
         // pour `power`/`heartRate`/`cadence`, qui n'y sont sinon pas abonnées
         // (cf. `MetricView.build`, même raison).
@@ -282,9 +288,9 @@ class _NotchBandState extends State<NotchBand> {
             color: color,
             // Inverse du bandeau du bas : le libellé au-dessus du chiffre.
             labelFirst: true,
+            expand: true,
           );
         },
-      ),
     );
   }
 
